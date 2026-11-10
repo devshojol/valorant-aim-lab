@@ -1,0 +1,1096 @@
+{
+ "a-long": {
+  "attack": [
+   {
+    "id": "a-long-a-1",
+    "name": "A Site corner (right)",
+    "cover": [
+     -29.45,
+     0,
+     12.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-long-a-2",
+    "name": "A Site pillar",
+    "cover": [
+     -32.45,
+     0,
+     18.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "a-long-a-3",
+    "name": "A Site corner",
+    "cover": [
+     -29.05,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-long-a-4",
+    "name": "A Site box",
+    "cover": [
+     -28.55,
+     0,
+     22.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-long-a-5",
+    "name": "A Site stack (right)",
+    "cover": [
+     -25.4,
+     0,
+     18.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 4
+   },
+   {
+    "id": "a-long-a-6",
+    "name": "A Site corner (right) 2",
+    "cover": [
+     -23.05,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   }
+  ],
+  "defend": [
+   {
+    "id": "a-long-d-1",
+    "name": "A Site corner (right)",
+    "cover": [
+     -35.56,
+     0,
+     15.95
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.85
+   },
+   {
+    "id": "a-long-d-2",
+    "name": "A Site corner (right) 2",
+    "cover": [
+     -35.56,
+     0,
+     20
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 3.6
+   },
+   {
+    "id": "a-long-d-3",
+    "name": "A Site corner",
+    "cover": [
+     -30.44,
+     0,
+     10
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "a-long-d-4",
+    "name": "A Site stack (left)",
+    "cover": [
+     -25,
+     0,
+     14.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-long-d-5",
+    "name": "A Lobby corner (left)",
+    "cover": [
+     -20.5,
+     0,
+     -16.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "a-long-d-6",
+    "name": "A Site box (right)",
+    "cover": [
+     -30.44,
+     0,
+     21.55
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-long-d-7",
+    "name": "A Lobby corner (left) 2",
+    "cover": [
+     -26.05,
+     0,
+     -16.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "a-long-d-8",
+    "name": "A Site pillar (right)",
+    "cover": [
+     -31.06,
+     0,
+     16.55
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   }
+  ]
+ },
+ "a-short": {
+  "attack": [
+   {
+    "id": "a-short-a-1",
+    "name": "A Site corner",
+    "cover": [
+     -20.95,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-short-a-2",
+    "name": "A Site stack",
+    "cover": [
+     -24.5,
+     0,
+     18.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "a-short-a-3",
+    "name": "A Site corner 2",
+    "cover": [
+     -28.45,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "a-short-a-4",
+    "name": "A Site corner (left)",
+    "cover": [
+     -26,
+     0,
+     12.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-short-a-5",
+    "name": "A Site corner (right)",
+    "cover": [
+     -17.45,
+     0,
+     24.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "a-short-a-6",
+    "name": "A Site box (left)",
+    "cover": [
+     -29,
+     0,
+     22.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-short-a-7",
+    "name": "A Site corner 3",
+    "cover": [
+     -17.56,
+     0,
+     29.9
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-short-a-8",
+    "name": "B Site corner (right)",
+    "cover": [
+     -14.95,
+     0,
+     32.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   }
+  ],
+  "defend": [
+   {
+    "id": "a-short-d-1",
+    "name": "A Short corner",
+    "cover": [
+     -21.44,
+     0,
+     6.55
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-short-d-2",
+    "name": "A Site corner",
+    "cover": [
+     -25.06,
+     0,
+     11
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-short-d-3",
+    "name": "A Site corner (left)",
+    "cover": [
+     -18.44,
+     0,
+     16
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "a-short-d-4",
+    "name": "A Site corner (left) 2",
+    "cover": [
+     -18.44,
+     0,
+     23.5
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "a-short-d-5",
+    "name": "A Site pillar (right)",
+    "cover": [
+     -33.44,
+     0,
+     17.5
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-short-d-6",
+    "name": "A Short corner 2",
+    "cover": [
+     -21.44,
+     0,
+     2.95
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 3.85
+   },
+   {
+    "id": "a-short-d-7",
+    "name": "A Site corner (right)",
+    "cover": [
+     -35.56,
+     0,
+     12.05
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 3.9
+   },
+   {
+    "id": "a-short-d-8",
+    "name": "A Lobby corner (right)",
+    "cover": [
+     -26.05,
+     0,
+     -16.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.75
+   }
+  ]
+ },
+ "mid": {
+  "attack": [
+   {
+    "id": "mid-a-1",
+    "name": "Mid pillar (left)",
+    "cover": [
+     -5,
+     0,
+     -1.06
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "mid-a-2",
+    "name": "Mid corner (left)",
+    "cover": [
+     -8.05,
+     0,
+     2.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.1
+   },
+   {
+    "id": "mid-a-3",
+    "name": "B Site corner",
+    "cover": [
+     -3.5,
+     0,
+     10.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "mid-a-4",
+    "name": "B Site corner 2",
+    "cover": [
+     3.55,
+     0,
+     10.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "mid-a-5",
+    "name": "Garage corner (right)",
+    "cover": [
+     10.06,
+     0,
+     -3.95
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "mid-a-6",
+    "name": "Garage corner (right) 2",
+    "cover": [
+     10.55,
+     0,
+     1.06
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.95
+   },
+   {
+    "id": "mid-a-7",
+    "name": "B Site box",
+    "cover": [
+     4.55,
+     0,
+     19.06
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "mid-a-8",
+    "name": "B Site box 2",
+    "cover": [
+     -4.6,
+     0,
+     19.06
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   }
+  ],
+  "defend": [
+   {
+    "id": "mid-d-1",
+    "name": "Mid pillar (right)",
+    "cover": [
+     -5.05,
+     0,
+     -3.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "mid-d-2",
+    "name": "Mid corner (left)",
+    "cover": [
+     6.55,
+     0,
+     -13.06
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "mid-d-3",
+    "name": "Mid box (left)",
+    "cover": [
+     5,
+     0,
+     -7.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "mid-d-4",
+    "name": "Mid corner (left) 2",
+    "cover": [
+     4.4,
+     0,
+     2.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 3.35
+   },
+   {
+    "id": "mid-d-5",
+    "name": "Mid corner (right)",
+    "cover": [
+     -5.9,
+     0,
+     -13.06
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "mid-d-6",
+    "name": "Mid corner (left) 3",
+    "cover": [
+     10.06,
+     0,
+     -11.45
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 1.75
+   },
+   {
+    "id": "mid-d-7",
+    "name": "Mid corner (right) 2",
+    "cover": [
+     -3.55,
+     0,
+     2.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.75
+   }
+  ]
+ },
+ "garage": {
+  "attack": [
+   {
+    "id": "garage-a-1",
+    "name": "C Site corner (right)",
+    "cover": [
+     20.5,
+     0,
+     10.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.9
+   },
+   {
+    "id": "garage-a-2",
+    "name": "C Site corner (right) 2",
+    "cover": [
+     31.4,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "garage-a-3",
+    "name": "C Site box",
+    "cover": [
+     23.45,
+     0,
+     20.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "garage-a-4",
+    "name": "C Site corner",
+    "cover": [
+     26.45,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 3
+   },
+   {
+    "id": "garage-a-5",
+    "name": "C Site box 2",
+    "cover": [
+     20.45,
+     0,
+     14.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.9
+   },
+   {
+    "id": "garage-a-6",
+    "name": "C Site corner (left)",
+    "cover": [
+     16,
+     0,
+     25.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "garage-a-7",
+    "name": "C Site corner 2",
+    "cover": [
+     20.45,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "garage-a-8",
+    "name": "Garage corner (left)",
+    "cover": [
+     12.44,
+     0,
+     3.95
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 4.2
+   }
+  ],
+  "defend": [
+   {
+    "id": "garage-d-1",
+    "name": "Garage corner",
+    "cover": [
+     19.06,
+     0,
+     9.1
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "garage-d-2",
+    "name": "Garage box",
+    "cover": [
+     15.55,
+     0,
+     3.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "garage-d-3",
+    "name": "Garage corner 2",
+    "cover": [
+     15.5,
+     0,
+     7.06
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.9
+   },
+   {
+    "id": "garage-d-4",
+    "name": "C Site corner (left)",
+    "cover": [
+     28.94,
+     0,
+     8.45
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 3
+   },
+   {
+    "id": "garage-d-5",
+    "name": "C Site box",
+    "cover": [
+     20.9,
+     0,
+     14.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "garage-d-6",
+    "name": "Garage corner 3",
+    "cover": [
+     15.1,
+     0,
+     -4.06
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "garage-d-7",
+    "name": "C Long corner (left)",
+    "cover": [
+     35.56,
+     0,
+     0.1
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.85
+   }
+  ]
+ },
+ "c-long": {
+  "attack": [
+   {
+    "id": "c-long-a-1",
+    "name": "C Site corner (left)",
+    "cover": [
+     28,
+     0,
+     10.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "c-long-a-2",
+    "name": "C Site stack",
+    "cover": [
+     28.6,
+     0,
+     18.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "c-long-a-3",
+    "name": "C Site pillar",
+    "cover": [
+     31.06,
+     0,
+     23.05
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "c-long-a-4",
+    "name": "C Site corner",
+    "cover": [
+     27.05,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "c-long-a-5",
+    "name": "C Site corner (left) 2",
+    "cover": [
+     21.5,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "c-long-a-6",
+    "name": "C Site corner 2",
+    "cover": [
+     32,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.95
+   },
+   {
+    "id": "c-long-a-7",
+    "name": "C Site box (left)",
+    "cover": [
+     23.05,
+     0,
+     22.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 3
+   },
+   {
+    "id": "c-long-a-8",
+    "name": "C Site corner (left) 3",
+    "cover": [
+     16.55,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   }
+  ],
+  "defend": [
+   {
+    "id": "c-long-d-1",
+    "name": "C Long corner (right)",
+    "cover": [
+     28.94,
+     0,
+     -0.1
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "c-long-d-2",
+    "name": "Garage corner (right)",
+    "cover": [
+     12.44,
+     0,
+     2.9
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "c-long-d-3",
+    "name": "C Site corner (left)",
+    "cover": [
+     35.56,
+     0,
+     13.45
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "c-long-d-4",
+    "name": "Garage corner (right) 2",
+    "cover": [
+     15.5,
+     0,
+     7.06
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.85
+   },
+   {
+    "id": "c-long-d-5",
+    "name": "C Site stack (left)",
+    "cover": [
+     31.94,
+     0,
+     17.45
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "c-long-d-6",
+    "name": "C Site corner (right)",
+    "cover": [
+     28.94,
+     0,
+     9.5
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "c-long-d-7",
+    "name": "C Site corner (left) 2",
+    "cover": [
+     35.56,
+     0,
+     17.05
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.9
+   },
+   {
+    "id": "c-long-d-8",
+    "name": "C Long corner",
+    "cover": [
+     35.56,
+     0,
+     1
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 3
+   }
+  ]
+ }
+}

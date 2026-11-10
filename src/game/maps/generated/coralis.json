@@ -1,0 +1,636 @@
+{
+ "a-main": {
+  "attack": [
+   {
+    "id": "a-main-a-1",
+    "name": "A Pyramid corner (right)",
+    "cover": [
+     -16.6,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-main-a-2",
+    "name": "A Pyramid corner",
+    "cover": [
+     -33.55,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-main-a-3",
+    "name": "A Pyramid box",
+    "cover": [
+     -27.95,
+     0,
+     16.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "a-main-a-4",
+    "name": "A Site box (left)",
+    "cover": [
+     -32,
+     0,
+     9.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-main-a-5",
+    "name": "A Pyramid corner 2",
+    "cover": [
+     -27.55,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-main-a-6",
+    "name": "A Pyramid box (right)",
+    "cover": [
+     -22.55,
+     0,
+     19.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 3.1
+   },
+   {
+    "id": "a-main-a-7",
+    "name": "A Pyramid corner (right) 2",
+    "cover": [
+     -14.05,
+     0,
+     32.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 3.05
+   },
+   {
+    "id": "a-main-a-8",
+    "name": "A Pyramid corner (right) 3",
+    "cover": [
+     -20.5,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 3.9
+   }
+  ],
+  "defend": [
+   {
+    "id": "a-main-d-1",
+    "name": "A Main box (left)",
+    "cover": [
+     -26.95,
+     0,
+     -4.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.85
+   },
+   {
+    "id": "a-main-d-2",
+    "name": "A Main corner (left)",
+    "cover": [
+     -23.95,
+     0,
+     -0.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 3.4
+   },
+   {
+    "id": "a-main-d-3",
+    "name": "A Hall corner (left)",
+    "cover": [
+     -12.44,
+     0,
+     6.55
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "a-main-d-4",
+    "name": "A Site pillar (left)",
+    "cover": [
+     -14.56,
+     0,
+     10.55
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-main-d-5",
+    "name": "A Site box (right)",
+    "cover": [
+     -32.05,
+     0,
+     7.06
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "a-main-d-6",
+    "name": "A Lobby corner",
+    "cover": [
+     -34.6,
+     0,
+     -15.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 4
+   },
+   {
+    "id": "a-main-d-7",
+    "name": "A Main corner (left) 2",
+    "cover": [
+     -24.44,
+     0,
+     -9.05
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-main-d-8",
+    "name": "A Main corner",
+    "cover": [
+     -34.06,
+     0,
+     2
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.9
+   }
+  ]
+ },
+ "mid": {
+  "attack": [
+   {
+    "id": "mid-a-1",
+    "name": "B Window corner (right)",
+    "cover": [
+     9.55,
+     0,
+     4.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "mid-a-2",
+    "name": "B Window corner (right) 2",
+    "cover": [
+     5.45,
+     0,
+     8.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "mid-a-3",
+    "name": "Mid pillar",
+    "cover": [
+     1,
+     0,
+     0.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.95
+   },
+   {
+    "id": "mid-a-4",
+    "name": "Mid box (left)",
+    "cover": [
+     -6.44,
+     0,
+     -6.05
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "mid-a-5",
+    "name": "B Window corner (right) 3",
+    "cover": [
+     11.9,
+     0,
+     8.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   }
+  ],
+  "defend": [
+   {
+    "id": "mid-d-1",
+    "name": "Mid pillar",
+    "cover": [
+     1.4,
+     0,
+     -1.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "mid-d-2",
+    "name": "Mid box (right)",
+    "cover": [
+     -5.05,
+     0,
+     -7.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "mid-d-3",
+    "name": "B Window stack (left)",
+    "cover": [
+     5.5,
+     0,
+     6.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "mid-d-4",
+    "name": "Mid corner (right)",
+    "cover": [
+     -6.5,
+     0,
+     -13.06
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 3
+   },
+   {
+    "id": "mid-d-5",
+    "name": "Mid stack (left)",
+    "cover": [
+     5,
+     0,
+     2.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "mid-d-6",
+    "name": "Mid Top corner (right)",
+    "cover": [
+     -3.55,
+     0,
+     8.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "mid-d-7",
+    "name": "Mid corner (right) 2",
+    "cover": [
+     -8.56,
+     0,
+     -8.05
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "mid-d-8",
+    "name": "Mid corner (left)",
+    "cover": [
+     8.56,
+     0,
+     -9.95
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.85
+   }
+  ]
+ },
+ "b-main": {
+  "attack": [
+   {
+    "id": "b-main-a-1",
+    "name": "Mid Top corner (left)",
+    "cover": [
+     13,
+     0,
+     25.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "b-main-a-2",
+    "name": "B Window corner (left)",
+    "cover": [
+     17.5,
+     0,
+     10.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "b-main-a-3",
+    "name": "B Window corner (left) 2",
+    "cover": [
+     13.4,
+     0,
+     8.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "b-main-a-4",
+    "name": "B Site box",
+    "cover": [
+     18.1,
+     0,
+     16.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "b-main-a-5",
+    "name": "B Window corner (left) 3",
+    "cover": [
+     17.05,
+     0,
+     4.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "b-main-a-6",
+    "name": "Mid Top corner (left) 2",
+    "cover": [
+     12.05,
+     0,
+     32.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "b-main-a-7",
+    "name": "B Window corner (left) 4",
+    "cover": [
+     13.94,
+     0,
+     17.45
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.7
+   }
+  ],
+  "defend": [
+   {
+    "id": "b-main-d-1",
+    "name": "B Elbow corner",
+    "cover": [
+     23.56,
+     0,
+     8.5
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "b-main-d-2",
+    "name": "B Window corner (right)",
+    "cover": [
+     17,
+     0,
+     8.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "b-main-d-3",
+    "name": "B Site box (right)",
+    "cover": [
+     17.56,
+     0,
+     16
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "b-main-d-4",
+    "name": "B Window corner (right) 2",
+    "cover": [
+     13.94,
+     0,
+     12.5
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 1.65
+   },
+   {
+    "id": "b-main-d-5",
+    "name": "B Window corner (right) 3",
+    "cover": [
+     13.94,
+     0,
+     17
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "b-main-d-6",
+    "name": "B Site stack (right)",
+    "cover": [
+     20.56,
+     0,
+     22
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.95
+   },
+   {
+    "id": "b-main-d-7",
+    "name": "B Window corner (right) 4",
+    "cover": [
+     12.55,
+     0,
+     4.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "b-main-d-8",
+    "name": "B Window stack (right)",
+    "cover": [
+     6.44,
+     0,
+     3.05
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   }
+  ]
+ }
+}

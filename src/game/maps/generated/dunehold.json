@@ -1,0 +1,922 @@
+{
+ "a-short": {
+  "attack": [
+   {
+    "id": "a-short-a-1",
+    "name": "A Site corner (left)",
+    "cover": [
+     -23.5,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-short-a-2",
+    "name": "A Site stack (left)",
+    "cover": [
+     -21.5,
+     0,
+     18.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "a-short-a-3",
+    "name": "A Short corner (right)",
+    "cover": [
+     -12.44,
+     0,
+     14.95
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "a-short-a-4",
+    "name": "A Site stack (left) 2",
+    "cover": [
+     -22,
+     0,
+     14.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "a-short-a-5",
+    "name": "A Site corner",
+    "cover": [
+     -19.45,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-short-a-6",
+    "name": "A Site corner 2",
+    "cover": [
+     -13.6,
+     0,
+     32.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 1.5
+   },
+   {
+    "id": "a-short-a-7",
+    "name": "A Site box",
+    "cover": [
+     -15.05,
+     0,
+     22.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-short-a-8",
+    "name": "A Site box 2",
+    "cover": [
+     -17.9,
+     0,
+     13.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.6
+   }
+  ],
+  "defend": [
+   {
+    "id": "a-short-d-1",
+    "name": "A Long corner (right)",
+    "cover": [
+     -35.56,
+     0,
+     5.9
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 1.4
+   },
+   {
+    "id": "a-short-d-2",
+    "name": "A Short corner (right)",
+    "cover": [
+     -21.95,
+     0,
+     9.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-short-d-3",
+    "name": "Showers corner",
+    "cover": [
+     -19.6,
+     0,
+     -0.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.9
+   },
+   {
+    "id": "a-short-d-4",
+    "name": "A Short corner",
+    "cover": [
+     -15.44,
+     0,
+     2.5
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.95
+   },
+   {
+    "id": "a-short-d-5",
+    "name": "A Site corner (left)",
+    "cover": [
+     -12.44,
+     0,
+     22
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "a-short-d-6",
+    "name": "A Short corner 2",
+    "cover": [
+     -15.44,
+     0,
+     7
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-short-d-7",
+    "name": "A Site corner (left) 2",
+    "cover": [
+     -12.44,
+     0,
+     16.6
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-short-d-8",
+    "name": "A Site stack (right)",
+    "cover": [
+     -20.56,
+     0,
+     17.45
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.75
+   }
+  ]
+ },
+ "a-long": {
+  "attack": [
+   {
+    "id": "a-long-a-1",
+    "name": "A Site corner (right)",
+    "cover": [
+     -29.45,
+     0,
+     9.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "a-long-a-2",
+    "name": "A Site corner",
+    "cover": [
+     -29.05,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "a-long-a-3",
+    "name": "A Site corner 2",
+    "cover": [
+     -33.55,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "a-long-a-4",
+    "name": "A Site box",
+    "cover": [
+     -29.45,
+     0,
+     22.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "a-long-a-5",
+    "name": "A Site box 2",
+    "cover": [
+     -34.4,
+     0,
+     15.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 1.25
+   },
+   {
+    "id": "a-long-a-6",
+    "name": "A Site corner (right) 2",
+    "cover": [
+     -19.6,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-long-a-7",
+    "name": "A Site corner (right) 3",
+    "cover": [
+     -25.45,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "a-long-a-8",
+    "name": "A Site stack (right)",
+    "cover": [
+     -24.44,
+     0,
+     17.95
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.8
+   }
+  ],
+  "defend": [
+   {
+    "id": "a-long-d-1",
+    "name": "A Long corner",
+    "cover": [
+     -30.44,
+     0,
+     7
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-long-d-2",
+    "name": "A Short box (left)",
+    "cover": [
+     -16.6,
+     0,
+     11.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 3.95
+   },
+   {
+    "id": "a-long-d-3",
+    "name": "A Short corner (left)",
+    "cover": [
+     -23,
+     0,
+     9.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "a-long-d-4",
+    "name": "A Site corner (right)",
+    "cover": [
+     -35.56,
+     0,
+     11
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 1.85
+   },
+   {
+    "id": "a-long-d-5",
+    "name": "A Site box (right)",
+    "cover": [
+     -30.44,
+     0,
+     22.45
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 3.6
+   },
+   {
+    "id": "a-long-d-6",
+    "name": "A Site corner (right) 2",
+    "cover": [
+     -35.56,
+     0,
+     24.05
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-long-d-7",
+    "name": "A Site corner (right) 3",
+    "cover": [
+     -35.56,
+     0,
+     16.4
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "a-long-d-8",
+    "name": "A Site corner (left)",
+    "cover": [
+     -27.05,
+     0,
+     9.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   }
+  ]
+ },
+ "hookah": {
+  "attack": [
+   {
+    "id": "hookah-a-1",
+    "name": "B Site pillar (right)",
+    "cover": [
+     24.55,
+     0,
+     25.94
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "hookah-a-2",
+    "name": "B Site stack (right)",
+    "cover": [
+     20.95,
+     0,
+     21.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.75
+   },
+   {
+    "id": "hookah-a-3",
+    "name": "B Site corner",
+    "cover": [
+     18.95,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.95
+   },
+   {
+    "id": "hookah-a-4",
+    "name": "B Site corner (right)",
+    "cover": [
+     28.4,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 3.6
+   },
+   {
+    "id": "hookah-a-5",
+    "name": "Hookah corner (left)",
+    "cover": [
+     14.95,
+     0,
+     9.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "hookah-a-6",
+    "name": "B Site corner (right) 2",
+    "cover": [
+     20.5,
+     0,
+     9.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.95
+   },
+   {
+    "id": "hookah-a-7",
+    "name": "B Site box (right)",
+    "cover": [
+     27.1,
+     0,
+     18.44
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 3.8
+   },
+   {
+    "id": "hookah-a-8",
+    "name": "B Site corner (right) 3",
+    "cover": [
+     32,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 3.55
+   }
+  ],
+  "defend": [
+   {
+    "id": "hookah-d-1",
+    "name": "B Site corner (left)",
+    "cover": [
+     28.94,
+     0,
+     7.4
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "hookah-d-2",
+    "name": "Hookah corner",
+    "cover": [
+     20.45,
+     0,
+     5.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "hookah-d-3",
+    "name": "Hookah corner (left)",
+    "cover": [
+     20.05,
+     0,
+     -5.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.85
+   },
+   {
+    "id": "hookah-d-4",
+    "name": "B Site box (left)",
+    "cover": [
+     27.95,
+     0,
+     16.06
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "hookah-d-5",
+    "name": "B Site box (left) 2",
+    "cover": [
+     34.94,
+     0,
+     12.95
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "hookah-d-6",
+    "name": "Hookah corner 2",
+    "cover": [
+     14.9,
+     0,
+     5.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 3.05
+   },
+   {
+    "id": "hookah-d-7",
+    "name": "B Long corner (left)",
+    "cover": [
+     35.56,
+     0,
+     3.55
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "hookah-d-8",
+    "name": "Hookah corner (left) 2",
+    "cover": [
+     23.56,
+     0,
+     -1.55
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.95
+   }
+  ]
+ },
+ "b-long": {
+  "attack": [
+   {
+    "id": "b-long-a-1",
+    "name": "B Site corner (left)",
+    "cover": [
+     28,
+     0,
+     9.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "b-long-a-2",
+    "name": "B Site corner",
+    "cover": [
+     33.95,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "b-long-a-3",
+    "name": "B Site pillar (left)",
+    "cover": [
+     25.4,
+     0,
+     23.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "b-long-a-4",
+    "name": "B Site box",
+    "cover": [
+     34.45,
+     0,
+     13.94
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 1.2
+   },
+   {
+    "id": "b-long-a-5",
+    "name": "B Site corner (left) 2",
+    "cover": [
+     23.45,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 2.85
+   },
+   {
+    "id": "b-long-a-6",
+    "name": "B Site box 2",
+    "cover": [
+     29.5,
+     0,
+     18.44
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "b-long-a-7",
+    "name": "B Site corner 2",
+    "cover": [
+     27.95,
+     0,
+     26.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.95
+   },
+   {
+    "id": "b-long-a-8",
+    "name": "B Site corner 3",
+    "cover": [
+     35.56,
+     0,
+     17.5
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 3.15
+   }
+  ],
+  "defend": [
+   {
+    "id": "b-long-d-1",
+    "name": "Hookah corner (right)",
+    "cover": [
+     20.45,
+     0,
+     5.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "b-long-d-2",
+    "name": "B Site corner (left)",
+    "cover": [
+     35.56,
+     0,
+     11.95
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "b-long-d-3",
+    "name": "Hookah corner (right) 2",
+    "cover": [
+     10.94,
+     0,
+     0.95
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.7
+   },
+   {
+    "id": "b-long-d-4",
+    "name": "Hookah corner (right) 3",
+    "cover": [
+     14,
+     0,
+     5.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.9
+   },
+   {
+    "id": "b-long-d-5",
+    "name": "Hookah corner (right) 4",
+    "cover": [
+     19.6,
+     0,
+     -5.56
+    ],
+    "peekDir": [
+     1,
+     0
+    ],
+    "maxPeek": 2.6
+   },
+   {
+    "id": "b-long-d-6",
+    "name": "B Site corner (left) 2",
+    "cover": [
+     35.56,
+     0,
+     18.55
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.8
+   },
+   {
+    "id": "b-long-d-7",
+    "name": "B Site box (left)",
+    "cover": [
+     30.44,
+     0,
+     17
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.65
+   },
+   {
+    "id": "b-long-d-8",
+    "name": "B Site corner",
+    "cover": [
+     28.94,
+     0,
+     8
+    ],
+    "peekDir": [
+     0,
+     1
+    ],
+    "maxPeek": 2.85
+   }
+  ]
+ }
+}
