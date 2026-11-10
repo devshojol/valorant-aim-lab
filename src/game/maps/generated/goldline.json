@@ -303,17 +303,17 @@
    },
    {
     "id": "mid-a-8",
-    "name": "Market box (right)",
+    "name": "Courtyard box (left)",
     "cover": [
-     4.94,
+     -5,
      0,
-     -0.55
+     9.44
     ],
     "peekDir": [
-     0,
-     -1
+     1,
+     0
     ],
-    "maxPeek": 2.65
+    "maxPeek": 2.85
    }
   ],
   "defend": [

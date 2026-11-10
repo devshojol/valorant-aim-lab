@@ -83,7 +83,7 @@
      1,
      0
     ],
-    "maxPeek": 1.5
+    "maxPeek": 2.6
    },
    {
     "id": "a-short-a-7",
@@ -127,7 +127,7 @@
      0,
      1
     ],
-    "maxPeek": 1.4
+    "maxPeek": 2.7
    },
    {
     "id": "a-short-d-2",
@@ -399,7 +399,7 @@
      0,
      -1
     ],
-    "maxPeek": 1.85
+    "maxPeek": 2.85
    },
    {
     "id": "a-long-d-5",

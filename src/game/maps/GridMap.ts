@@ -16,19 +16,6 @@ import type { Vec3 } from '../../types';
  */
 export const CELL = 1.5;
 
-/** Cell glyphs. */
-export const G = {
-  WALL: '#',
-  FLOOR: '.',
-  CRATE_LOW: 'c',
-  CRATE: 'C',
-  CRATE_STACK: 'D',
-  PILLAR: 'P',
-  RAIL: 'r',
-  ARCH: '=',
-  WINDOW: 'w',
-} as const;
-
 export interface CellShape {
   /** Solid from y0 to y1 (blocks). */
   solids: { y0: number; y1: number; kind: SolidKind }[];
@@ -40,7 +27,7 @@ export interface CellShape {
 export type SolidKind = 'wall' | 'crate' | 'crate-low' | 'stack' | 'pillar' | 'rail' | 'raised' | 'lintel';
 
 export const WALL_HEIGHT = 6;
-export const RAISE_STEP = 0.4;
+const RAISE_STEP = 0.4;
 
 export function shapeOf(ch: string): CellShape {
   switch (ch) {

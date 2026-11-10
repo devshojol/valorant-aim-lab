@@ -10,7 +10,7 @@ import { BEHAVIOR_INFO, DIFFICULTY_LABEL, MODE_INFO, fmtDuration } from '../util
 import { PRIMARY_WEAPONS, SECONDARY_WEAPONS, WEAPONS } from '../game/weapons/weaponConfigs';
 import { spotUsableFrom } from '../game/practice/PracticeDirector';
 
-export function usableSpotIds(cfg: PracticeConfig): Set<string> {
+function usableSpotIds(cfg: PracticeConfig): Set<string> {
   const def = getMapDefinition(cfg.mapId);
   const data = mapDataFor(cfg.mapId);
   const loc = def.locations.find((l) => l.id === cfg.locationId) ?? def.locations[0];

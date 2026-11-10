@@ -10,6 +10,7 @@
  */
 
 import { findPath, nearestWalkable, type NavPoint } from '../navigation/GridNavigator';
+import { BOT_SCALE } from '../perception/visibility';
 import { type Bot, type BotBrain, type BotContext, lerp } from '../Bot';
 
 type State = 'patrol' | 'engage' | 'chase' | 'cover' | 'hold-cover' | 'peek';
@@ -114,7 +115,7 @@ export class DeathmatchBehavior implements BotBrain {
           const z = space.z(r);
           const y = nav.height[idx];
           const hidden =
-            !world.segmentClear(x, y + 1.6, z, eye[0], eye[1], eye[2]) && !world.segmentClear(x, y + 1.1, z, eye[0], eye[1], eye[2]);
+            !world.segmentClear(x, y + 1.6 * BOT_SCALE, z, eye[0], eye[1], eye[2]) && !world.segmentClear(x, y + 1.1 * BOT_SCALE, z, eye[0], eye[1], eye[2]);
           if (hidden) return [x, z];
         }
         for (const [dc, dr] of [

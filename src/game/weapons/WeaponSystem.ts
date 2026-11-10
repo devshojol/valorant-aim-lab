@@ -172,6 +172,7 @@ export class WeaponSystem {
     if (input && player.alive) {
       if (input.consume('primary')) this.switchTo(0);
       if (input.consume('secondary')) this.switchTo(1);
+      if (input.consume('swap')) this.switchTo(this.current === 0 ? 1 : 0);
       if (input.consume('reload')) this.startReload();
       this.adsHeld = w.altFire === 'ads' && input.isDown('alt') && this.reloadTimer <= 0 && this.equipTimer <= 0;
       if (w.altFire === 'burst' && input.consume('alt')) this.tryBurst();

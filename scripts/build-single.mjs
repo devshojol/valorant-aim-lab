@@ -11,7 +11,9 @@ execSync('npx vite build --config vite.single.config.ts', { stdio: 'inherit' });
 const dir = 'dist-single';
 const js = fs.readFileSync(path.join(dir, 'app.js'), 'utf8').replace(/<\/script/gi, '<\\/script');
 const css = fs.readFileSync(path.join(dir, 'app.css'), 'utf8').replace(/<\/style/gi, '<\\/style');
+const icon = `data:image/svg+xml,${encodeURIComponent(fs.readFileSync('public/favicon.svg', 'utf8').trim())}`;
 const head = `<title>Tactical Aim Lab</title>
+<link rel="icon" type="image/svg+xml" href="${icon}" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />

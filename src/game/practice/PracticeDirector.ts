@@ -8,16 +8,16 @@ import { Bot, type BotContext } from '../bots/Bot';
 import type { BotView } from '../bots/BotVisual';
 import { DeathmatchBehavior } from '../bots/behaviors/DeathmatchBehavior';
 import { PeekBehavior } from '../bots/behaviors/PeekBehavior';
-import { analysePeekLine, isHumanoidVisible } from '../bots/perception/visibility';
+import { analysePeekLine, BOT_EYE, isHumanoidVisible } from '../bots/perception/visibility';
 import type { MapData } from '../maps/MapData';
 import { STAND_EYE } from '../player/PlayerController';
 import type { SessionTracker } from './SessionTracker';
 
 /** Bots never peek closer than this to the player's spawn (horizontal metres). */
-export const MIN_SPOT_DISTANCE = 6;
+const MIN_SPOT_DISTANCE = 6;
 
 /** Closest horizontal distance between a spawn and a spot's whole peek line (cover → full peek). */
-export function spotDistance(spawn: SpawnPoint, spot: EnemySpot): number {
+function spotDistance(spawn: SpawnPoint, spot: EnemySpot): number {
   const ax = spot.cover[0], az = spot.cover[2];
   const bx = ax + spot.peekDir[0] * spot.maxPeek, bz = az + spot.peekDir[1] * spot.maxPeek;
   const px = spawn.pos[0], pz = spawn.pos[2];
@@ -153,7 +153,7 @@ export class PracticeDirector {
         for (const b of this.bots) {
           if (!b.alive) continue;
           if (Math.hypot(b.x - c[0], b.z - c[2]) < 12) ok = false;
-          else if (isHumanoidVisible(ctx.world, b.x, b.y + 1.6, b.z, c[0], c[1], c[2], 0)) ok = false;
+          else if (isHumanoidVisible(ctx.world, b.x, b.y + BOT_EYE, b.z, c[0], c[1], c[2], 0)) ok = false;
           if (!ok) break;
         }
         if (!ok) continue;

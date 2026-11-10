@@ -16,8 +16,13 @@ export type Action =
   | 'reload'
   | 'primary'
   | 'secondary'
+  /** Swap to the other weapon (mouse wheel). */
+  | 'swap'
   | 'fire'
   | 'alt';
+
+/** Minimum time between two wheel-driven weapon swaps. */
+const WHEEL_COOLDOWN_MS = 180;
 
 const KEYMAP: Record<string, Action> = {
   KeyW: 'forward',
@@ -57,6 +62,7 @@ export class Input {
   lastUnlock = -1e9;
   /** Timestamps of mouse events for input-latency diagnostics. */
   mouseEvents = 0;
+  private lastWheel = -1e9;
 
   private readonly listeners: [EventTarget, string, EventListener, AddEventListenerOptions?][] = [];
 
@@ -66,6 +72,21 @@ export class Input {
     this.on(document, 'mousemove', (e) => this.onMouseMove(e as MouseEvent));
     this.on(document, 'mousedown', (e) => this.onMouseButton(e as MouseEvent, true));
     this.on(document, 'mouseup', (e) => this.onMouseButton(e as MouseEvent, false));
+    // mouse wheel swaps weapons; one swap per notch (trackpads send bursts of small events)
+    this.on(
+      document,
+      'wheel',
+      (e) => {
+        if (!this.enabled || (!this.locked && !this.unlockedLook)) return;
+        e.preventDefault();
+        const w = e as WheelEvent;
+        const now = performance.now();
+        if (Math.abs(w.deltaY) < 1 || now - this.lastWheel < WHEEL_COOLDOWN_MS) return;
+        this.lastWheel = now;
+        this.pressed.add('swap');
+      },
+      { passive: false },
+    );
     this.on(document, 'contextmenu', (e) => {
       if (this.enabled) e.preventDefault();
     });

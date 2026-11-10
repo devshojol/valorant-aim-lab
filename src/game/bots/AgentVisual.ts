@@ -31,12 +31,15 @@ import {
 import { loadContainer } from '../rendering/gltf';
 import type { PlacedSkin, WeaponSkin } from '../weapons/WeaponSkins';
 import type { BotAssets, BotView } from './BotVisual';
+import { BOT_SCALE } from './perception/visibility';
 
 const ENEMY_RED = Color3.FromHexString('#ff3b4e');
-/** Eye height of a standing bot, matching the head hitbox (legs 0.86 + head centre 0.75). */
-const EYE_HEIGHT = 1.63;
-/** Pelvis drop at full crouch — the hitboxes drop 0.55 m, so the head stays inside its box. */
-const CROUCH_DROP = 0.55;
+/** Eye height of a standing bot, matching the head hitbox (legs 0.86 + head centre 0.75, × BOT_SCALE). */
+const EYE_HEIGHT = 1.63 * BOT_SCALE;
+/** Pelvis drop at full crouch — the hitboxes drop 0.55 m × BOT_SCALE, so the head stays inside its box. */
+const CROUCH_DROP = 0.55 * BOT_SCALE;
+/** Body-sized offsets below are for a 1.8 m person; bots are BOT_SCALE larger. */
+const S = BOT_SCALE;
 /** Length of the bots' rifle when a weapon skin is used (shorter than first person so both hands reach). */
 const BOT_RIFLE_LENGTH = 0.8;
 
@@ -163,7 +166,7 @@ function chainBelow(node: TransformNode, stop: TransformNode): TransformNode[] {
   return out.reverse();
 }
 
-export class AgentVisual implements BotView {
+class AgentVisual implements BotView {
   private readonly root: TransformNode;
   private readonly model: TransformNode;
   private readonly nodes: Record<NodeKey, TransformNode>;
@@ -591,9 +594,9 @@ export class AgentVisual implements BotView {
     const footR = this.pos(n.footR, new Vector3());
 
     // pelvis: crouch drop + walk bob + slight forward shift when crouched
-    const drop = CROUCH_DROP * c + Math.abs(Math.sin(ph)) * 0.035 * moving;
+    const drop = CROUCH_DROP * c + Math.abs(Math.sin(ph)) * 0.035 * S * moving;
     this.refresh(n.pelvis);
-    this.translateWorld(n.pelvis, up.scale(-drop).addInPlace(fwd.scale(-0.08 * c)));
+    this.translateWorld(n.pelvis, up.scale(-drop).addInPlace(fwd.scale(-0.08 * S * c)));
     this.refresh(n.pelvis);
 
     // spine: lean forward when crouched, blade the rifle (turn right), follow aim pitch
@@ -634,11 +637,11 @@ export class AgentVisual implements BotView {
     // legs: planted feet, stepping along the movement direction when walking
     const mlen = Math.hypot(this.moveX, this.moveZ);
     const mdir = mlen > 0.01 ? new Vector3(this.moveX / mlen, 0, this.moveZ / mlen) : fwd;
-    const stride = 0.22 * moving;
-    const lift = 0.09 * moving;
+    const stride = 0.22 * S * moving;
+    const lift = 0.09 * S * moving;
     const s = Math.sin(ph);
     const cph = Math.cos(ph);
-    const spread = right.scale(0.05 * c);
+    const spread = right.scale(0.05 * S * c);
     const tL = footL
       .add(mdir.scale(stride * s))
       .addInPlace(up.scale(Math.max(0, cph) * lift))
@@ -669,7 +672,7 @@ export class AgentVisual implements BotView {
     const u = up.scale(cp).subtractInPlace(fwd.scale(sp));
     this.gunDir.copyFrom(f);
     this.gunUp.copyFrom(u);
-    const grip = shoulderR.add(f.scale(0.2)).addInPlace(u.scale(-0.13)).addInPlace(right.scale(-0.06));
+    const grip = shoulderR.add(f.scale(0.2 * S)).addInPlace(u.scale(-0.13 * S)).addInPlace(right.scale(-0.06 * S));
     this.gun.position.copyFrom(grip);
     // gun local axes: +X right, +Y up, +Z along the barrel
     Quaternion.RotationQuaternionFromAxisToRef(Vector3.Cross(u, f), u, f, this.gun.rotationQuaternion!);

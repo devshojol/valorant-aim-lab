@@ -25,7 +25,7 @@ import type { AgentAssets } from '../bots/AgentVisual';
 import type { WeaponSkin } from '../weapons/WeaponSkins';
 import { ArmsTemplate } from '../weapons/FirstPersonArms';
 import { PeekBehavior } from '../bots/behaviors/PeekBehavior';
-import { visibleSampleCount } from '../bots/perception/visibility';
+import { BOT_SCALE, visibleSampleCount } from '../bots/perception/visibility';
 import { Input } from '../core/Input';
 import { drawCrosshair } from '../hud/crosshairRenderer';
 import { Minimap } from '../hud/Minimap';
@@ -66,7 +66,6 @@ const DEG = Math.PI / 180;
 const BASE_HFOV = 103 * DEG;
 const SIM_STEP = 1 / 120;
 
-
 /** True when running inside an iframe (pointer lock may be disallowed by the embedder's sandbox). */
 function isEmbedded(): boolean {
   try {
@@ -96,8 +95,6 @@ interface DamageIndicator {
   yaw: number;
   t: number;
 }
-
-export { webglAvailable };
 
 export class GameEngine {
   private engine!: AbstractEngine;
@@ -511,7 +508,7 @@ export class GameEngine {
   private updateHitboxView() {
     const meshes = this.hitboxMeshes!;
     this.director.bots.forEach((b, i) => {
-      const boxes = humanoidHitboxes(b.crouch);
+      const boxes = humanoidHitboxes(b.crouch, BOT_SCALE);
       (['legs', 'body', 'head'] as HitZone[]).forEach((zone, k) => {
         const m = meshes[i * 3 + k];
         if (!m) return;
@@ -753,7 +750,7 @@ export class GameEngine {
     let best: { bot: Bot; t: number; zone: HitZone } | null = null;
     for (const bot of this.director.bots) {
       if (!bot.alive) continue;
-      const h = rayHumanoid(o[0], o[1], o[2], d[0], d[1], d[2], bot.x, bot.y, bot.z, bot.yaw, bot.crouch, best ? best.t : maxT);
+      const h = rayHumanoid(o[0], o[1], o[2], d[0], d[1], d[2], bot.x, bot.y, bot.z, bot.yaw, bot.crouch, best ? best.t : maxT, BOT_SCALE);
       if (h && (!best || h.t < best.t)) best = { bot, t: h.t, zone: h.zone };
     }
 
@@ -885,7 +882,7 @@ export class GameEngine {
       if (b.alive && this.player.alive) {
         const dx = b.x - ex;
         const dz = b.z - ez;
-        const dy = b.y + 1.2 - ey;
+        const dy = b.y + 1.2 * BOT_SCALE - ey;
         let yawDiff = Math.atan2(dx, dz) - this.player.yaw;
         while (yawDiff > Math.PI) yawDiff -= Math.PI * 2;
         while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
@@ -1084,7 +1081,7 @@ export class GameEngine {
       if (!b) return false;
       const [ex, ey, ez] = this.player.eye();
       const legH = 0.86 - 0.55 * b.crouch;
-      const ty = b.y + (zone === 'head' ? legH + 0.75 : legH + 0.3);
+      const ty = b.y + (zone === 'head' ? legH + 0.75 : legH + 0.3) * BOT_SCALE;
       this.player.yaw = Math.atan2(b.x - ex, b.z - ez);
       this.player.pitch = Math.atan2(ty - ey, Math.hypot(b.x - ex, b.z - ez));
       return true;

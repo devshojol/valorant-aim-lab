@@ -591,23 +591,9 @@
    },
    {
     "id": "mid-d-4",
-    "name": "Mid corner (left) 2",
-    "cover": [
-     4.4,
-     0,
-     2.56
-    ],
-    "peekDir": [
-     -1,
-     0
-    ],
-    "maxPeek": 3.35
-   },
-   {
-    "id": "mid-d-5",
     "name": "Mid corner (right)",
     "cover": [
-     -5.9,
+     -8.9,
      0,
      -13.06
     ],
@@ -615,11 +601,11 @@
      1,
      0
     ],
-    "maxPeek": 2.7
+    "maxPeek": 2.6
    },
    {
-    "id": "mid-d-6",
-    "name": "Mid corner (left) 3",
+    "id": "mid-d-5",
+    "name": "Mid corner (left) 2",
     "cover": [
      10.06,
      0,
@@ -632,7 +618,7 @@
     "maxPeek": 1.75
    },
    {
-    "id": "mid-d-7",
+    "id": "mid-d-6",
     "name": "Mid corner (right) 2",
     "cover": [
      -3.55,
@@ -644,6 +630,20 @@
      0
     ],
     "maxPeek": 2.75
+   },
+   {
+    "id": "mid-d-7",
+    "name": "Mid corner (left) 3",
+    "cover": [
+     3.95,
+     0,
+     2.56
+    ],
+    "peekDir": [
+     -1,
+     0
+    ],
+    "maxPeek": 3
    }
   ]
  },
@@ -652,20 +652,6 @@
    {
     "id": "garage-a-1",
     "name": "C Site corner (right)",
-    "cover": [
-     20.5,
-     0,
-     10.94
-    ],
-    "peekDir": [
-     -1,
-     0
-    ],
-    "maxPeek": 2.9
-   },
-   {
-    "id": "garage-a-2",
-    "name": "C Site corner (right) 2",
     "cover": [
      31.4,
      0,
@@ -678,7 +664,7 @@
     "maxPeek": 2.65
    },
    {
-    "id": "garage-a-3",
+    "id": "garage-a-2",
     "name": "C Site box",
     "cover": [
      23.45,
@@ -692,7 +678,7 @@
     "maxPeek": 2.75
    },
    {
-    "id": "garage-a-4",
+    "id": "garage-a-3",
     "name": "C Site corner",
     "cover": [
      26.45,
@@ -706,18 +692,32 @@
     "maxPeek": 3
    },
    {
-    "id": "garage-a-5",
+    "id": "garage-a-4",
     "name": "C Site box 2",
     "cover": [
-     20.45,
+     19.06,
      0,
-     14.56
+     16.45
+    ],
+    "peekDir": [
+     0,
+     -1
+    ],
+    "maxPeek": 2.95
+   },
+   {
+    "id": "garage-a-5",
+    "name": "C Site corner (right) 2",
+    "cover": [
+     20.05,
+     0,
+     10.94
     ],
     "peekDir": [
      -1,
      0
     ],
-    "maxPeek": 2.9
+    "maxPeek": 2.8
    },
    {
     "id": "garage-a-6",

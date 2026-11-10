@@ -9,6 +9,7 @@
 import type { EnemySpot, MapLocation, SpawnPoint, Vec2 } from '../../../types';
 import { CELL, GridBuilder, GridSpace } from '../GridMap';
 import type { MapDefinition } from '../MapData';
+import { BOT_RADIUS } from '../../bots/perception/visibility';
 
 const COLS = 52;
 const ROWS = 48;
@@ -137,7 +138,8 @@ function hug(v: number): number {
   const base = Math.round(v);
   const f = v - base;
   if (Math.abs(f) < 0.25 || (CELL as number) === AUTHORED_CELL) return v;
-  const gap = (0.5 - Math.abs(f)) * AUTHORED_CELL;
+  // keep the authored distance to the edge, but never less than a bot's radius (bots are larger now)
+  const gap = Math.max((0.5 - Math.abs(f)) * AUTHORED_CELL, BOT_RADIUS + 0.02);
   return base + Math.sign(f) * Math.max(0, 0.5 - gap / CELL);
 }
 

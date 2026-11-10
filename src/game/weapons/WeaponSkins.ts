@@ -35,7 +35,7 @@ export interface SkinSpec {
   chambers?: number;
 }
 
-export const SKIN_SPECS: Partial<Record<WeaponId, SkinSpec>> = {
+const SKIN_SPECS: Partial<Record<WeaponId, SkinSpec>> = {
   vandal: {
     file: 'models/weapons/vandal.glb',
     yaw: Math.PI / 2,

@@ -12,6 +12,7 @@
 import type { EnemySpot, SpawnPoint, Vec2 } from '../../types';
 import { analysePeekLine, BOT_HEIGHT, BOT_RADIUS, isHumanoidVisible } from '../bots/perception/visibility';
 import { STAND_EYE } from '../player/PlayerController';
+import { spotUsableFrom } from '../practice/PracticeDirector';
 import { CELL, shapeOf } from './GridMap';
 import type { MapData } from './MapData';
 
@@ -31,6 +32,9 @@ export interface FinderOptions {
   perSpawn: number;
   minSeparation: number;
 }
+
+/** Every player spawn needs at least this many spots it can actually see a peek from. */
+const MIN_USABLE = 3;
 
 const DEFAULTS: FinderOptions = { minDist: 7, maxDist: 38, fov: 62, maxExpose: 2.2, perSpawn: 4, minSeparation: 3.5 };
 
@@ -58,7 +62,7 @@ function coverLabel(ch: string): string {
 }
 
 /** Candidates visible-on-peek from one spawn. */
-export function findCandidates(data: MapData, spawn: SpawnPoint, opts: Partial<FinderOptions> = {}): SpotCandidate[] {
+function findCandidates(data: MapData, spawn: SpawnPoint, opts: Partial<FinderOptions> = {}): SpotCandidate[] {
   const o = { ...DEFAULTS, ...opts };
   const { def, space, world } = data;
   const grid = def.grid;
@@ -169,18 +173,35 @@ export function pickSpots(data: MapData, spawns: SpawnPoint[], idPrefix: string,
       const info = analysePeekLine(data.world, eye, s.cover[0], s.cover[1], s.cover[2], s.peekDir[0], s.peekDir[1], s.maxPeek);
       return info.hideAt !== null && info.exposeAt !== null;
     });
-  for (const sp of spawns) {
-    const cands = findCandidates(data, sp, o);
+  const perSpawnCands = spawns.map((sp) => {
+    const cands = findCandidates(data, sp, o).filter((c) => spotUsableFrom(data.world, sp, c.spot));
     for (const c of cands) if (spawns.length > 1 && worksFromAll(c.spot)) c.score += 3;
-    cands.sort((a, b) => b.score - a.score);
+    return cands.sort((a, b) => b.score - a.score);
+  });
+  spawns.forEach((_, i) => {
     let n = 0;
-    for (const cnd of cands) {
+    for (const cnd of perSpawnCands[i]) {
       if (n >= o.perSpawn) break;
       if (!far(cnd.spot)) continue;
       chosen.push(cnd.spot);
       n++;
     }
-  }
+  });
+  // Top-up: a spawn whose own picks were blocked by spots chosen for another spawn (too close to
+  // them, but not usable from here) gets more of its candidates, with the separation relaxed
+  // step by step, until at least MIN_USABLE spots work from it.
+  spawns.forEach((sp, i) => {
+    const usable = () => chosen.filter((s) => spotUsableFrom(data.world, sp, s)).length;
+    for (const sepK of [1, 0.7, 0.45]) {
+      for (const cnd of perSpawnCands[i]) {
+        if (usable() >= MIN_USABLE) return;
+        if (chosen.includes(cnd.spot)) continue;
+        const sep = o.minSeparation * sepK;
+        if (chosen.some((x) => Math.hypot(x.cover[0] - cnd.spot.cover[0], x.cover[2] - cnd.spot.cover[2]) < sep)) continue;
+        chosen.push(cnd.spot);
+      }
+    }
+  });
   // name + id
   const { def, space } = data;
   const used = new Map<string, number>();

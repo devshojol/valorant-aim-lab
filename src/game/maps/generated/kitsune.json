@@ -317,17 +317,17 @@
    },
    {
     "id": "mid-a-8",
-    "name": "Mid Top corner (left) 2",
+    "name": "Mid Top stack (right)",
     "cover": [
-     -5.45,
+     7,
      0.8,
-     -2.56
+     4.94
     ],
     "peekDir": [
-     1,
+     -1,
      0
     ],
-    "maxPeek": 2.65
+    "maxPeek": 3
    }
   ],
   "defend": [

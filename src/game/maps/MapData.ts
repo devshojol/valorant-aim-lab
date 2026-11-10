@@ -202,7 +202,7 @@ function hash01(a: number, b: number, seed: number): number {
  *  - small crates against corridor walls (sub-cell, away from spawns and enemy peek lines).
  * None of it changes ground-level sight lines through open space or which cells are walkable.
  */
-export function dressMap(def: MapDefinition, space: GridSpace): { wallTop: Float32Array; arches: Set<number>; props: MapBox[] } {
+function dressMap(def: MapDefinition, space: GridSpace): { wallTop: Float32Array; arches: Set<number>; props: MapBox[] } {
   const rows = def.grid.length;
   const cols = def.grid[0].length;
   const seed = [...def.id].reduce((a, c) => a * 31 + c.charCodeAt(0), 7) | 0;

@@ -50,10 +50,6 @@ export class PeekBehavior implements BotBrain {
     return `${this.state}:${this.plan}`;
   }
 
-  get currentPlan() {
-    return this.plan;
-  }
-
   /** Position on the peek line at distance d from the cover anchor. */
   private pointAt(d: number): [number, number] {
     return [this.spot.cover[0] + this.spot.peekDir[0] * d, this.spot.cover[2] + this.spot.peekDir[1] * d];

@@ -16,6 +16,7 @@ const KEYS: [string, string][] = [
   ['Ctrl / C (hold)', 'Crouch (use C when not fullscreen — Ctrl+W closes browser tabs)'],
   ['Space', 'Jump'],
   ['1 / 2', 'Primary / sidearm'],
+  ['Mouse wheel', 'Swap weapon'],
   ['Esc', 'Pause & release mouse'],
 ];
 

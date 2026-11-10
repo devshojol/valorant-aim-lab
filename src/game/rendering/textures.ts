@@ -3,7 +3,7 @@
  */
 import { DynamicTexture, Texture, type Scene } from './babylon';
 
-export function rng(seed: number) {
+function rng(seed: number) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -20,7 +20,7 @@ function hexToRgb(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-export function shade(hex: string, f: number, alpha = 1): string {
+function shade(hex: string, f: number, alpha = 1): string {
   const [r, g, b] = hexToRgb(hex);
   const c = (v: number) => Math.max(0, Math.min(255, Math.round(f >= 0 ? v + (255 - v) * f : v * (1 + f))));
   return `rgba(${c(r)},${c(g)},${c(b)},${alpha})`;

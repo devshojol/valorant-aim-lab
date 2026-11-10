@@ -3,15 +3,15 @@ import type { CollisionWorld } from '../physics/CollisionWorld';
 import type { Input } from '../core/Input';
 import { YAW_DEG_PER_COUNT } from '../../settings/defaults';
 
-export const PLAYER_RADIUS = 0.3;
-export const STAND_HEIGHT = 1.8;
-export const CROUCH_HEIGHT = 1.25;
+const PLAYER_RADIUS = 0.3;
+const STAND_HEIGHT = 1.8;
+const CROUCH_HEIGHT = 1.25;
 export const STAND_EYE = 1.62;
-export const CROUCH_EYE = 1.08;
+const CROUCH_EYE = 1.08;
 /** Full running speed in m/s (raised from 5.4, about 8% faster). Walk and crouch speeds scale from it. */
 export const RUN_SPEED = 5.85;
-export const WALK_MULT = 0.65;
-export const CROUCH_MULT = 0.5;
+const WALK_MULT = 0.65;
+const CROUCH_MULT = 0.5;
 const ACCEL = 48;
 const DECEL_RELEASE = 34;
 const DECEL_COUNTER = 75;

@@ -9,6 +9,7 @@ import {
   TransformNode,
   type Scene,
 } from '../rendering/babylon';
+import { BOT_SCALE } from './perception/visibility';
 
 const ENEMY_RED = Color3.FromHexString('#ff3b4e');
 
@@ -106,6 +107,7 @@ export class BotVisual implements BotView {
     this.accentMat.specularColor = new Color3(0.2, 0.2, 0.2);
 
     this.root = new TransformNode(`bot-${id}`, scene);
+    this.root.scaling.setAll(BOT_SCALE); // built at person size, drawn BOT_SCALE larger (matches the hitboxes)
     this.hips = new TransformNode(`bot-${id}-hips`, scene);
     this.hips.parent = this.root;
     this.upper = new TransformNode(`bot-${id}-upper`, scene);

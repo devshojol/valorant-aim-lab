@@ -10,7 +10,9 @@ It's a fan-made training tool and isn't affiliated with Riot Games. The maps, we
 npm install
 npm run dev          # http://localhost:5173
 npm run build        # typecheck + production build into dist/
+npm run build:single # one self-contained HTML file in dist-single/ (no models or recordings)
 npm run preview      # serve the production build
+npm run typecheck    # tsc --noEmit
 npm test             # unit tests (vitest)
 ```
 
@@ -67,6 +69,12 @@ src/
     audio/gunSynth.ts         layered offline-rendered gunshots (crack/blast/body/sub/mechanics/reflections/reverb)
     hud/crosshairRenderer.ts  screen-space crosshair, shared by the editor preview and the in-game HUD
     hud/Minimap.ts            rotating minimap drawn on the overlay canvas (pre-rendered from the map grid)
+public/
+  favicon.svg                 crosshair icon (inlined as a data URI in the single-file build)
+  models/                     agent, arms and weapon-skin GLBs with their credits (README.md)
+  sounds/                     optional recordings that replace synthesised sounds (README.md lists the slots)
+scripts/                      single-file build, Playwright smoke tests, asset preparation
+tests/                        vitest unit tests; tests/tools/gen-spots.test.ts regenerates enemy spots
 ```
 
 React never drives the frame loop. `GameEngine` runs its own `requestAnimationFrame` loop: mouse look is applied first for latency, then fixed 120 Hz simulation substeps (player, weapons, bots), then render. React receives throttled HUD snapshots at about 12 Hz plus discrete events (kill feed, status, session end). The crosshair, hit markers and damage-direction arcs are drawn every frame onto a 2D overlay canvas by the engine.
@@ -116,7 +124,7 @@ Each item below was verified by the automated tests in this repo.
 - Each weapon has its own fire rate, magazine, reload, damage by range, first-shot accuracy, spray-spread growth, movement and air inaccuracy, and a hand-authored recoil pattern with recovery.
 - Headshots, body shots and leg shots are separate hitboxes that follow crouch.
 - ADS with 1.25× zoom on rifles and the Sheriff. The Classic right-click fires a 3-round burst.
-- Reload with sound cues (or one recorded reload file per gun), auto-reload when the magazine is empty, weapon switching with equip time. The reload animation and its sound cues run faster than the reload itself (55% of the reload time, at most 1.3 s); the gun then waits, ready, until the reload completes, so reload times are unchanged.
+- Reload with sound cues (or one recorded reload file per gun), auto-reload when the magazine is empty, weapon switching with equip time (1 / 2, or the mouse wheel to swap; one swap per wheel notch). The reload animation and its sound cues run faster than the reload itself (55% of the reload time, at most 1.3 s); the gun then waits, ready, until the reload completes, so reload times are unchanged.
 - Weapon skins: the Vandal (Gaia), Phantom (Reaver) and Sheriff (Arcane) use GLB models from `public/models/weapons`, placed from measured grip, handguard, muzzle and sight points so the hands, muzzle flash, tracers and aim-down-sights line up. The Vandal's magazine drops on reload and the Sheriff's front assembly spins after each shot. Sage bots carry the Vandal skin. Settings → Graphics → Gun models switches back to the simple guns; the Classic has no skin.
 - First-person arms (Settings → Graphics → First-person arms):
   - **Animated** (default): the "M4 - FPS Weapon Animations Pack (v.1)" by BarcodeGames (CC BY 4.0, `public/models/fp-arms-anim.glb`, prepared by `scripts/prepare-fp-arms.mjs`), a rigged pair of gloved forearms with Draw, Fire, Reload and Reload_Empty animations. `src/game/weapons/AnimatedArms.ts` evaluates the clips from game state every frame: Draw follows the equip timer, Fire restarts on each shot, Reload (or Reload_Empty when the magazine was empty) follows the reload, played up to 2.2× faster than authored and finishing at 80% of the reload time, and the first Fire frame is the idle pose. The pack's rifle meshes are removed and the game's gun rides the pack's weapon joint, its grip on the M4's grip and pitched a few degrees so its handguard meets the left hand. The gun's magazine follows the pack's magazine joints, so the left hand pulls the old one and seats the new one (the Vandal skin and the simple guns have a separate magazine; the Phantom and Sheriff skins don't). The rig is raised and turned right about its spine so the gun sits lower right in this game's wide field of view, then turned about the gun so the barrel runs parallel to the view and points at the crosshair; aiming down sights moves the whole rig to centre the sights. Pistols have no clips in the pack: the pistol is placed as before, the right hand takes the same hold on its grip that the idle pose has on the M4, and the left arm is solved with two-bone IK to cup it. Synthesized reload cues follow the reload clip.
@@ -125,6 +133,7 @@ Each item below was verified by the automated tests in this repo.
 - Muzzle flash with a light, tracers (the Phantom is suppressed and has none), wall decals, spark and hit particles, and view kick.
 
 **Bots**
+- Bots are person-sized (1.8 m, the same as the player). One constant (`BOT_SCALE` in `src/game/bots/perception/visibility.ts`) scales the model, hitboxes (head, body, legs), collision size, eye height and the visibility checks together; the player's own hitboxes stay person-sized. Enemy hiding spots are generated for that size, so regenerate them after changing it.
 - Stationary angle holding, jiggle peek, shoulder peek (bait), wide swing (backs up, then sprints wide), crouch spray (with recoil compensation), counter-strafe ADAD, and repositioning to another free spot.
 - Perception uses a ~130° field of view with multi-point raycast line of sight, so bots can't see or shoot through walls.
 - Reaction delay, an aim error that converges over time, and a head-or-body aim choice.

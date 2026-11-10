@@ -38,7 +38,7 @@ export interface GunProfile {
   peak: number;
 }
 
-export const GUN_PROFILES: Record<GunSoundId, GunProfile> = {
+const GUN_PROFILES: Record<GunSoundId, GunProfile> = {
   // Vandal — heavy 7.62-style rifle: hard crack, big low-mid punch, rattly action, long city tail.
   'rifle-heavy': {
     length: 1.7,
@@ -165,7 +165,7 @@ export function makeImpulseResponse(ctx: BaseAudioContext, seconds: number, deca
 }
 
 /** Render one gunshot variant. `seed` changes noise and micro-timing so repeated shots differ. */
-export async function renderGunshot(p: GunProfile, sampleRate: number, seed: number): Promise<AudioBuffer> {
+async function renderGunshot(p: GunProfile, sampleRate: number, seed: number): Promise<AudioBuffer> {
   const len = Math.ceil(p.length * sampleRate);
   const oc = new OfflineAudioContext(2, len, sampleRate);
   const r = rng(seed);

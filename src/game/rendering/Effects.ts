@@ -172,10 +172,6 @@ export class Effects {
     }
   }
 
-  clearDecals() {
-    for (const h of this.holes) h.position.y = -50;
-  }
-
   dispose() {
     this.sparks.dispose();
     this.hitPuffs.dispose();

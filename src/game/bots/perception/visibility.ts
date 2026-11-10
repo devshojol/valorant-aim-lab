@@ -1,10 +1,17 @@
 import { COL_SIGHT, type CollisionWorld } from '../../physics/CollisionWorld';
 
-export const BOT_RADIUS = 0.3;
-export const BOT_HEIGHT = 1.8;
+/**
+ * Size of the bots relative to a person (1.8 m). 1 = the same size as the player. Their model,
+ * hitboxes, collision, eyes and visibility checks all derive from this.
+ */
+export const BOT_SCALE = 1;
+export const BOT_RADIUS = 0.3 * BOT_SCALE;
+export const BOT_HEIGHT = 1.8 * BOT_SCALE;
+/** Eye height of a standing bot (legs 0.86 + head centre 0.75, scaled). */
+export const BOT_EYE = (0.86 + 0.75) * BOT_SCALE;
 
 /** Sample points on a humanoid used for visibility tests (world space). */
-export function humanoidSamples(
+function humanoidSamples(
   x: number,
   y: number,
   z: number,
@@ -13,18 +20,21 @@ export function humanoidSamples(
   sideX: number,
   sideZ: number,
   out: number[] = [],
+  /** Body scale: 1 for the player, BOT_SCALE for bots. */
+  scale = 1,
 ): number[] {
-  const legH = 0.86 - 0.55 * crouch;
-  const head = y + legH + 0.75;
-  const chest = y + legH + 0.32;
-  const shoulder = 0.26;
+  const legH = (0.86 - 0.55 * crouch) * scale;
+  const head = y + legH + 0.75 * scale;
+  const chest = y + legH + 0.32 * scale;
+  const shoulder = 0.26 * scale;
+  const cheek = 0.12 * scale;
   out.length = 0;
   out.push(x, head, z);
   out.push(x, chest, z);
   out.push(x + sideX * shoulder, chest, z + sideZ * shoulder);
   out.push(x - sideX * shoulder, chest, z - sideZ * shoulder);
-  out.push(x + sideX * 0.12, head, z + sideZ * 0.12);
-  out.push(x - sideX * 0.12, head, z - sideZ * 0.12);
+  out.push(x + sideX * cheek, head, z + sideZ * cheek);
+  out.push(x - sideX * cheek, head, z - sideZ * cheek);
   out.push(x, y + legH * 0.5, z);
   return out;
 }
@@ -41,6 +51,8 @@ export function visibleSampleCount(
   y: number,
   z: number,
   crouch: number,
+  /** Body scale of the target: bots by default, 1 for the player. */
+  scale = BOT_SCALE,
 ): number {
   let dx = x - eyeX;
   let dz = z - eyeZ;
@@ -50,7 +62,7 @@ export function visibleSampleCount(
   // perpendicular
   const sx = -dz;
   const sz = dx;
-  const pts = humanoidSamples(x, y, z, crouch, sx, sz, tmp);
+  const pts = humanoidSamples(x, y, z, crouch, sx, sz, tmp, scale);
   let count = 0;
   for (let i = 0; i < pts.length; i += 3) {
     if (world.segmentClear(eyeX, eyeY, eyeZ, pts[i], pts[i + 1], pts[i + 2], COL_SIGHT)) count++;
@@ -67,8 +79,9 @@ export function isHumanoidVisible(
   y: number,
   z: number,
   crouch: number,
+  scale = BOT_SCALE,
 ): boolean {
-  return visibleSampleCount(world, eyeX, eyeY, eyeZ, x, y, z, crouch) > 0;
+  return visibleSampleCount(world, eyeX, eyeY, eyeZ, x, y, z, crouch, scale) > 0;
 }
 
 export interface ExposureInfo {

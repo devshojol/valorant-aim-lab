@@ -4,7 +4,7 @@ import type { CollisionWorld } from '../physics/CollisionWorld';
 import type { PlayerController } from '../player/PlayerController';
 import { WEAPONS, recoilAt } from '../weapons/weaponConfigs';
 import { smoothstep } from '../weapons/WeaponSystem';
-import { BOT_RADIUS, visibleSampleCount } from './perception/visibility';
+import { BOT_RADIUS, BOT_SCALE, visibleSampleCount } from './perception/visibility';
 import type { BotView } from './BotVisual';
 
 const DEG = Math.PI / 180;
@@ -40,7 +40,7 @@ export function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
 }
 
-export function gauss(rng: () => number) {
+function gauss(rng: () => number) {
   let u = 0;
   let v = 0;
   while (u === 0) u = rng();
@@ -144,7 +144,7 @@ export class Bot {
   }
   eye(): Vec3 {
     const legH = 0.86 - 0.55 * this.crouch;
-    return [this.x, this.y + legH + 0.75, this.z];
+    return [this.x, this.y + (legH + 0.75) * BOT_SCALE, this.z];
   }
 
   place(x: number, y: number, z: number, yaw: number) {
@@ -219,7 +219,7 @@ export class Bot {
       const toYaw = Math.atan2(dx, dz);
       const off = Math.abs(angleDiff(toYaw, this.yaw));
       if (off < 65 * DEG || dist < 2.5) {
-        visible = visibleSampleCount(ctx.world, ex, ey, ez, p.pos.x, p.pos.y, p.pos.z, p.crouch) > 0;
+        visible = visibleSampleCount(ctx.world, ex, ey, ez, p.pos.x, p.pos.y, p.pos.z, p.crouch, 1) > 0;
       }
     }
     if (visible) {
@@ -393,7 +393,7 @@ export class Bot {
     const crouchStep = dt / 0.14;
     this.crouch += Math.max(-crouchStep, Math.min(crouchStep, this.crouchTarget - this.crouch));
     const pos = { x: this.x, y: this.y, z: this.z };
-    const h = 1.8 - 0.55 * this.crouch;
+    const h = (1.8 - 0.55 * this.crouch) * BOT_SCALE;
     const res = ctx.world.moveBody(pos, BOT_RADIUS, h, this.vx * dt, this.vy * dt, this.vz * dt, 0.45, this.grounded);
     this.x = pos.x;
     this.y = pos.y;

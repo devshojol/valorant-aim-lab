@@ -237,7 +237,7 @@ export function GamePage({ config }: { config: PracticeConfig }) {
               <span>WASD move · Shift walk</span>
               <span>Ctrl / C crouch · Space jump</span>
               <span>LMB fire · RMB aim / burst</span>
-              <span>R reload · 1 / 2 weapons</span>
+              <span>R reload · 1 / 2 or wheel weapons</span>
               <span>Esc pause</span>
             </div>
           </div>

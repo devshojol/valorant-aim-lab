@@ -18,7 +18,7 @@ import { Vector3, VertexBuffer, type AbstractMesh, type Scene } from '../renderi
 import { loadContainer } from '../rendering/gltf';
 import { BONE, type ArmBoneDef } from './armBones';
 
-export const ARM_MODEL_URL = 'models/fp-arms.glb';
+const ARM_MODEL_URL = 'models/fp-arms.glb';
 const EXPECTED_VERTICES = 9198;
 
 /** Model units → metres (wrist to middle fingertip ≈ 0.21 m). */

@@ -334,7 +334,7 @@ export interface LocalBox {
  * Ray vs a box defined in a frame rotated by `yaw` around Y and translated to (px,py,pz).
  * Returns t or -1.
  */
-export function rayYawBox(
+function rayYawBox(
   ox: number,
   oy: number,
   oz: number,
@@ -407,14 +407,16 @@ export type HitZone = 'head' | 'body' | 'legs';
 
 /**
  * Humanoid hitboxes for a given crouch factor (0 standing → 1 crouched).
- * Shared by bots and the player so damage rules are symmetrical.
+ * Shared by bots and the player so damage rules are symmetrical; `scale` sizes the whole body
+ * (1 for the player, BOT_SCALE for bots).
  */
-export function humanoidHitboxes(crouch: number): Record<HitZone, LocalBox> {
+export function humanoidHitboxes(crouch: number, scale = 1): Record<HitZone, LocalBox> {
+  const s = scale;
   const legH = 0.86 - 0.55 * crouch;
   return {
-    legs: { cx: 0, cy: legH / 2, cz: 0, hx: 0.2, hy: legH / 2, hz: 0.14 },
-    body: { cx: 0, cy: legH + 0.3, cz: 0, hx: 0.27, hy: 0.3, hz: 0.17 },
-    head: { cx: 0, cy: legH + 0.75, cz: 0.02, hx: 0.135, hy: 0.15, hz: 0.14 },
+    legs: { cx: 0, cy: (legH / 2) * s, cz: 0, hx: 0.2 * s, hy: (legH / 2) * s, hz: 0.14 * s },
+    body: { cx: 0, cy: (legH + 0.3) * s, cz: 0, hx: 0.27 * s, hy: 0.3 * s, hz: 0.17 * s },
+    head: { cx: 0, cy: (legH + 0.75) * s, cz: 0.02 * s, hx: 0.135 * s, hy: 0.15 * s, hz: 0.14 * s },
   };
 }
 
@@ -432,6 +434,7 @@ export function rayHumanoid(
   yaw: number,
   crouch: number,
   maxDist: number,
+  scale = 1,
 ): { t: number; zone: HitZone } | null {
   // Broad phase: bounding cylinder check.
   const qx = px - ox;
@@ -442,9 +445,9 @@ export function rayHumanoid(
     const tClosest = proj / horizLen2;
     const cx = ox + dx * tClosest - px;
     const cz = oz + dz * tClosest - pz;
-    if (cx * cx + cz * cz > 0.8 * 0.8) return null;
+    if (cx * cx + cz * cz > 0.8 * scale * (0.8 * scale)) return null;
   }
-  const boxes = humanoidHitboxes(crouch);
+  const boxes = humanoidHitboxes(crouch, scale);
   let best: { t: number; zone: HitZone } | null = null;
   for (const zone of ['head', 'body', 'legs'] as HitZone[]) {
     const t = rayYawBox(ox, oy, oz, dx, dy, dz, px, py, pz, yaw, boxes[zone], maxDist);

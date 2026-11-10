@@ -23,14 +23,6 @@ export function save<T>(key: string, value: T): void {
   }
 }
 
-export function remove(key: string): void {
-  try {
-    localStorage.removeItem(PREFIX + key);
-  } catch {
-    /* ignore */
-  }
-}
-
 /** Deep-merge stored objects onto defaults so new settings fields get defaults. */
 export function mergeDefaults<T>(defaults: T, stored: unknown): T {
   if (stored === null || typeof stored !== 'object' || Array.isArray(stored)) return (stored as T) ?? defaults;

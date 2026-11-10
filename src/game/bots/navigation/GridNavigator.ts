@@ -171,7 +171,7 @@ export function findPath(
 }
 
 /** True when a straight walk from a to b stays on walkable, level-compatible cells with clearance. */
-export function walkClear(nav: NavGrid, space: GridSpace, a: NavPoint, b: NavPoint, clearance = 0.4): boolean {
+function walkClear(nav: NavGrid, space: GridSpace, a: NavPoint, b: NavPoint, clearance = 0.4): boolean {
   const dx = b[0] - a[0];
   const dz = b[1] - a[1];
   const len = Math.hypot(dx, dz);

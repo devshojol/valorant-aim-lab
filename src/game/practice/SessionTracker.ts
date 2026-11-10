@@ -2,7 +2,7 @@ import type { PracticeConfig, SessionStats, WeaponId } from '../../types';
 import type { HitZone } from '../physics/CollisionWorld';
 import type { ShotInfo } from '../weapons/WeaponSystem';
 
-export function emptyStats(cfg: PracticeConfig): SessionStats {
+function emptyStats(cfg: PracticeConfig): SessionStats {
   const now = Date.now();
   return {
     id: `${now.toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`,

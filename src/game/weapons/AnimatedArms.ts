@@ -19,7 +19,7 @@ import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 import { Matrix, Quaternion, TransformNode, Vector3, type AbstractMesh, type Scene } from '../rendering/babylon';
 import { loadContainer } from '../rendering/gltf';
 
-export const ARMS_ANIM_URL = 'models/fp-arms-anim.glb';
+const ARMS_ANIM_URL = 'models/fp-arms-anim.glb';
 
 const DEG = Math.PI / 180;
 
@@ -60,7 +60,7 @@ interface Framing {
   /** Then shift (metres, camera space). */
   offset: Vector3;
 }
-let FRAMING: Framing = { pitch: 9 * DEG, yaw: 7 * DEG, offset: new Vector3(0.02, -0.01, 0.04) };
+const FRAMING: Framing = { pitch: 9 * DEG, yaw: 7 * DEG, offset: new Vector3(0.02, -0.01, 0.04) };
 /** Fire clip playback speed, and the fastest the reload clip may be squeezed. */
 const FIRE_SPEED = 1.15;
 const MAX_RELOAD_SPEED = 2.2;
@@ -267,12 +267,6 @@ export class AnimatedArms {
     F.decompose(tS, this.frame.rotationQuaternion!, this.frame.position);
     this.framed = true;
     this.guns.forEach((g) => (g.idle = null)); // the idle gun pose depends on the framing
-  }
-
-  /** Debug/tuning: change the framing (degrees, metres) and re-apply it. */
-  setFraming(pitchDeg: number, yawDeg: number, x = 0, y = 0, z = 0) {
-    FRAMING = { pitch: pitchDeg * DEG, yaw: yawDeg * DEG, offset: new Vector3(x, y, z) };
-    this.framed = false;
   }
 
   setVisible(v: boolean) {

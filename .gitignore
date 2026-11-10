@@ -4,3 +4,4 @@ dist-single
 e2e-shots
 *.log
 .vercel
+*.tsbuildinfo
