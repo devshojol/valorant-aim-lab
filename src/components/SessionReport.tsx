@@ -14,7 +14,15 @@ export function SessionReportBody({ s }: { s: SessionStats }) {
         {MODE_INFO[s.mode].label} · {mapName(s.mapId)} / {locationName(s.mapId, s.locationId)} ({s.side === 'attack' ? 'Attacking' : 'Defending'}) ·{' '}
         {DIFFICULTY_LABEL[s.difficulty]} · {fmtDuration(s.durationSec)}
       </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+      {s.mode === 'spray' && (
+        <div className="mb-2 grid grid-cols-2 gap-2 md:grid-cols-4">
+          <Stat label="Avg spray score" value={s.spray ? Math.round(s.spray.avgScore) : '—'} sub="0 = no control, 100 = perfect" accent />
+          <Stat label="Best spray" value={s.spray ? s.spray.bestScore : '—'} sub={`${s.spray?.sprays ?? 0} sprays scored`} />
+          <Stat label="Avg error" value={s.spray ? `${s.spray.avgErrorDeg.toFixed(2)}°` : '—'} sub="from the first-shot point" />
+          <Stat label="Tight bullets" value={s.spray ? `${Math.round(s.spray.avgTightPct)}%` : '—'} sub="within 0.6° (a head at 15 m)" />
+        </div>
+      )}
+      <div className={s.mode === 'spray' ? 'hidden' : 'grid grid-cols-2 gap-2 md:grid-cols-4'}>
         <Stat label="Score" value={s.score} accent />
         <Stat label="Kills / Deaths" value={`${s.kills} / ${s.deaths}`} />
         <Stat label="Accuracy" value={`${accuracy(s)}%`} sub={`${s.hits} hits / ${s.shots} shots`} />

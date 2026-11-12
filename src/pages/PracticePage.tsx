@@ -156,7 +156,7 @@ export function PracticePage() {
           </Card>
 
           <Card title="3 · Mode">
-            <div className="grid gap-2 md:grid-cols-3">
+            <div className="grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
               {(Object.keys(MODE_INFO) as PracticeMode[]).map((m) => (
                 <button
                   key={m}
@@ -181,6 +181,14 @@ export function PracticePage() {
             </div>
           </Card>
 
+          {cfg.mode === 'spray' ? (
+            <Card title="5 · Bots">
+              <p className="text-sm text-mute">
+                Spray Control has no bots. Stand a few metres from any wall, hold fire for a full magazine and pull the mouse against the recoil. The panel on
+                the right of the screen plots every bullet and scores each spray from 0 (mouse held still) to 100 (recoil fully cancelled).
+              </p>
+            </Card>
+          ) : (
           <Card
             title="5 · Bots"
             right={
@@ -201,6 +209,30 @@ export function PracticePage() {
                 <Segmented value={cfg.difficulty} onChange={setDifficulty} options={(['easy', 'normal', 'hard', 'radiant', 'custom'] as Difficulty[]).map((d) => ({ value: d, label: DIFFICULTY_LABEL[d] }))} />
               </Field>
             </div>
+            <div className="grid gap-x-6 md:grid-cols-2">
+              <Slider
+                label="Headshot chance"
+                value={cfg.tuning.headshotChance}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={(v) => tune({ headshotChance: v })}
+                format={(v) => (v <= 0 ? 'Never' : `${Math.round(v * 100)}%`)}
+              />
+              <Slider
+                label="Bot damage"
+                value={cfg.tuning.damageMult}
+                min={0.1}
+                max={1.5}
+                step={0.05}
+                onChange={(v) => tune({ damageMult: v })}
+                format={(v) => `${Math.round(v * 100)}%`}
+              />
+            </div>
+            <p className="mb-3 text-xs text-dim">
+              Headshot chance is how often a bot aims for your head when it spots you (a Vandal headshot kills in one bullet); at "Never" bots deal no headshot
+              damage. Bot damage scales every hit you take. Changing either switches the difficulty to Custom.
+            </p>
             {cfg.mode === 'angle-hold' && (
               <Field label="Bot behaviour">
                 <Segmented
@@ -226,6 +258,7 @@ export function PracticePage() {
               </div>
             )}
           </Card>
+          )}
 
           <Card title="6 · Session">
             <Field label="Duration">

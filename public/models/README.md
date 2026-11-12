@@ -48,8 +48,9 @@ quantized (`weld`, `simplify --ratio 0.06 --error 0.01`, `quantize`).
 
 # First-person arms (`fp-arms.glb`)
 
-Used for the player's arms when **Settings → Graphics → First-person arms** is set to *Rigged arms* (the default).
-If the file is missing or isn't the expected model, the game uses its built-in arms (simple shapes, no file needed).
+Used for the player's arms when **Settings → Graphics → First-person arms** is set to *Rigged arms*, and as the fallback
+when the animated arms can't load. If the file is missing or isn't the expected model, the game uses its built-in arms
+(simple shapes, no file needed).
 
 ## Credit (CC BY 4.0)
 

@@ -17,6 +17,11 @@ export const MODE_INFO: Record<PracticeMode, { label: string; short: string; des
     short: 'Deathmatch',
     desc: 'Bots roam the whole map, hunt you by sound and sight, take cover when hurt and re-peek.',
   },
+  spray: {
+    label: 'Spray Control',
+    short: 'Spray',
+    desc: 'No bots. Spray at a wall and pull against the recoil; a live plot scores how close you keep every bullet to the first shot.',
+  },
 };
 
 export const BEHAVIOR_INFO: Record<BotBehavior, { label: string; desc: string }> = {

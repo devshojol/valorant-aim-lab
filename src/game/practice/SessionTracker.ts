@@ -1,4 +1,4 @@
-import type { PracticeConfig, SessionStats, WeaponId } from '../../types';
+import type { PracticeConfig, SessionStats, SprayResult, WeaponId } from '../../types';
 import type { HitZone } from '../physics/CollisionWorld';
 import type { ShotInfo } from '../weapons/WeaponSystem';
 
@@ -105,12 +105,29 @@ export class SessionTracker {
     this.stats.escapes++;
   }
 
+  /** Add a scored spray to the session's running averages. */
+  spray(r: SprayResult) {
+    const s = this.stats.spray ?? { sprays: 0, avgScore: 0, bestScore: 0, avgErrorDeg: 0, avgTightPct: 0 };
+    const n = s.sprays + 1;
+    this.stats.spray = {
+      sprays: n,
+      avgScore: (s.avgScore * s.sprays + r.score) / n,
+      bestScore: Math.max(s.bestScore, r.score),
+      avgErrorDeg: (s.avgErrorDeg * s.sprays + r.avgErrorDeg) / n,
+      avgTightPct: (s.avgTightPct * s.sprays + r.tightPct) / n,
+    };
+  }
+
   baited() {
     this.stats.baitedShots++;
   }
 
   computeScore(): number {
     const st = this.stats;
+    if (st.mode === 'spray') {
+      st.score = Math.round(st.spray?.avgScore ?? 0);
+      return st.score;
+    }
     const reactionBonus = st.reactionTimes.reduce((a, rt) => a + Math.max(0, 700 - rt) / 10, 0);
     let score = st.kills * 100 + this.hsKills * 50 - st.deaths * 120;
     if (st.mode === 'angle-hold') score += reactionBonus - st.escapes * 50;
@@ -123,7 +140,7 @@ export class SessionTracker {
     this.stats.endedAt = Date.now();
     this.stats.durationSec = Math.round(durationSec);
     this.computeScore();
-    return { ...this.stats, reactionTimes: [...this.stats.reactionTimes], killTimes: [...this.stats.killTimes] };
+    return { ...this.stats, spray: this.stats.spray && { ...this.stats.spray }, reactionTimes: [...this.stats.reactionTimes], killTimes: [...this.stats.killTimes] };
   }
 }
 

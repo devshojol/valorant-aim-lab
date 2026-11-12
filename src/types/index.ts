@@ -97,8 +97,12 @@ export type Difficulty = 'easy' | 'normal' | 'hard' | 'radiant' | 'custom';
 export interface BotTuning {
   /** Base reaction time in milliseconds. */
   reactionMs: number;
-  /** 0..1 — shapes aim error, head-aim probability and recoil control. */
+  /** 0..1 — shapes aim error and recoil control. */
   accuracy: number;
+  /** 0..1 — chance the bot aims for the head each time it spots the player. At 0 bots never deal headshot damage. */
+  headshotChance: number;
+  /** Multiplier on the damage bots deal to the player (1 = real weapon damage). */
+  damageMult: number;
   /** 0..1 — how often bots initiate peeks. */
   peekFrequency: number;
   /** Seconds a bot stays exposed on a committed peek. */
@@ -166,7 +170,7 @@ export interface MapSummary {
 /* Practice                                                            */
 /* ------------------------------------------------------------------ */
 
-export type PracticeMode = 'angle-hold' | 'jiggle' | 'deathmatch';
+export type PracticeMode = 'angle-hold' | 'jiggle' | 'deathmatch' | 'spray';
 
 export interface PracticeConfig {
   mapId: string;
@@ -236,7 +240,7 @@ export interface CrosshairPreset {
   settings: CrosshairSettings;
 }
 
-export type GraphicsPreset = 'low' | 'medium' | 'high' | 'custom';
+export type GraphicsPreset = 'potato' | 'low' | 'medium' | 'high' | 'custom';
 
 export interface GraphicsSettings {
   preset: GraphicsPreset;
@@ -245,6 +249,16 @@ export interface GraphicsSettings {
   resolutionScale: number;
   antialias: boolean;
   effects: 'low' | 'medium' | 'high';
+  /** Tone mapping, contrast and vignette. Off saves per-pixel work on integrated GPUs. */
+  postFx: boolean;
+  /** 'simple' drops the fill light (one light less per pixel); the sky light is raised to compensate. */
+  lighting: 'simple' | 'full';
+  /** 'low' halves the map texture size and turns anisotropic filtering off. */
+  textureQuality: 'low' | 'high';
+  /** Lower the render resolution automatically while the frame rate is under target, and restore it after. */
+  adaptiveResolution: boolean;
+  /** Frame-rate limit in frames per second (0 = unlimited). */
+  fpsCap: number;
   renderer: 'webgl2' | 'webgpu';
   /** Enter fullscreen (with Keyboard Lock) when a session starts — stops Ctrl+W closing the tab. */
   fullscreen: boolean;
@@ -302,6 +316,37 @@ export interface WeaponStatLine {
   kills: number;
 }
 
+/** One bullet of a spray, as offsets in degrees from the first-shot aim point (x right, y up). */
+export interface SprayPoint {
+  /** Where the bullet went (control + random spread). */
+  bullet: Vec2;
+  /** Centre of the spread cone: aim movement + recoil pattern. This is the part the player controls. */
+  control: Vec2;
+  /** The recoil pattern's offset for this bullet (where it goes with no control). */
+  recoil: Vec2;
+}
+
+export interface SprayResult {
+  weapon: WeaponId;
+  bullets: number;
+  /** Average distance of the cone centre from the first-shot point. */
+  avgErrorDeg: number;
+  /** Share of bullets whose cone centre stayed within the tight radius. */
+  tightPct: number;
+  /** 0 = mouse held still, 100 = recoil fully cancelled. */
+  score: number;
+  points: SprayPoint[];
+}
+
+/** Spray-control totals for a session. */
+export interface SpraySummary {
+  sprays: number;
+  avgScore: number;
+  bestScore: number;
+  avgErrorDeg: number;
+  avgTightPct: number;
+}
+
 export interface SessionStats {
   id: string;
   startedAt: number;
@@ -336,6 +381,8 @@ export interface SessionStats {
   /** Shots fired at bots that were only jiggling/shoulder peeking. */
   baitedShots: number;
   perWeapon: Partial<Record<WeaponId, WeaponStatLine>>;
+  /** Spray-control results (spray mode only). */
+  spray?: SpraySummary;
   score: number;
 }
 

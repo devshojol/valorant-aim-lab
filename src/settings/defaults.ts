@@ -13,6 +13,8 @@ export const DIFFICULTY_PRESETS: Record<Exclude<Difficulty, 'custom'>, BotTuning
   easy: {
     reactionMs: 650,
     accuracy: 0.22,
+    headshotChance: 0.05,
+    damageMult: 0.6,
     peekFrequency: 0.3,
     peekDuration: 1.4,
     moveSpeed: 0.75,
@@ -23,6 +25,8 @@ export const DIFFICULTY_PRESETS: Record<Exclude<Difficulty, 'custom'>, BotTuning
   normal: {
     reactionMs: 420,
     accuracy: 0.45,
+    headshotChance: 0.18,
+    damageMult: 0.85,
     peekFrequency: 0.5,
     peekDuration: 1.0,
     moveSpeed: 0.9,
@@ -33,6 +37,8 @@ export const DIFFICULTY_PRESETS: Record<Exclude<Difficulty, 'custom'>, BotTuning
   hard: {
     reactionMs: 270,
     accuracy: 0.68,
+    headshotChance: 0.4,
+    damageMult: 1,
     peekFrequency: 0.7,
     peekDuration: 0.75,
     moveSpeed: 1.0,
@@ -43,6 +49,8 @@ export const DIFFICULTY_PRESETS: Record<Exclude<Difficulty, 'custom'>, BotTuning
   radiant: {
     reactionMs: 175,
     accuracy: 0.86,
+    headshotChance: 0.65,
+    damageMult: 1,
     peekFrequency: 0.9,
     peekDuration: 0.55,
     moveSpeed: 1.05,
@@ -96,10 +104,27 @@ export const CROSSHAIR_COLORS: { name: string; hex: string }[] = [
   { name: 'Red', hex: '#ff2a2a' },
 ];
 
-export const GRAPHICS_PRESETS: Record<Exclude<GraphicsPreset, 'custom'>, Omit<GraphicsSettings, 'preset' | 'renderer' | 'fullscreen' | 'botModel' | 'gunModels' | 'fpArms'>> = {
-  low: { shadows: 'off', resolutionScale: 0.75, antialias: false, effects: 'low' },
-  medium: { shadows: 'medium', resolutionScale: 1, antialias: true, effects: 'medium' },
-  high: { shadows: 'high', resolutionScale: 1, antialias: true, effects: 'high' },
+/** Everything a preset decides. Renderer, fullscreen, adaptive resolution and the FPS cap stay as the user set them. */
+export type GraphicsPresetValues = Omit<GraphicsSettings, 'preset' | 'renderer' | 'fullscreen' | 'adaptiveResolution' | 'fpsCap'>;
+
+export const GRAPHICS_PRESETS: Record<Exclude<GraphicsPreset, 'custom'>, GraphicsPresetValues> = {
+  // For machines with no dedicated GPU (or software rendering): nothing that costs per-pixel work.
+  potato: {
+    shadows: 'off', resolutionScale: 0.6, antialias: false, effects: 'low', postFx: false, lighting: 'simple', textureQuality: 'low',
+    botModel: 'dummy', gunModels: 'simple', fpArms: 'simple',
+  },
+  low: {
+    shadows: 'off', resolutionScale: 0.75, antialias: false, effects: 'low', postFx: true, lighting: 'simple', textureQuality: 'high',
+    botModel: 'dummy', gunModels: 'skins', fpArms: 'animated',
+  },
+  medium: {
+    shadows: 'medium', resolutionScale: 1, antialias: true, effects: 'medium', postFx: true, lighting: 'full', textureQuality: 'high',
+    botModel: 'agent', gunModels: 'skins', fpArms: 'animated',
+  },
+  high: {
+    shadows: 'high', resolutionScale: 1, antialias: true, effects: 'high', postFx: true, lighting: 'full', textureQuality: 'high',
+    botModel: 'agent', gunModels: 'skins', fpArms: 'animated',
+  },
 };
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -114,7 +139,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
     rawInput: true,
   },
   crosshair: DEFAULT_CROSSHAIR,
-  graphics: { preset: 'medium', renderer: 'webgl2', fullscreen: true, botModel: 'agent', gunModels: 'skins', fpArms: 'animated', ...GRAPHICS_PRESETS.medium },
+  graphics: { preset: 'medium', renderer: 'webgl2', fullscreen: true, adaptiveResolution: true, fpsCap: 0, ...GRAPHICS_PRESETS.medium },
   audio: { master: 0.8, weapons: 0.8, effects: 0.8, footsteps: 0.9, hitSounds: true },
   hud: {
     showFps: true,

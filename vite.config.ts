@@ -10,9 +10,11 @@ export default defineConfig({
     chunkSizeWarningLimit: 4000,
     rollupOptions: {
       output: {
+        // Babylon is left to the bundler: it lands in chunks only the lazily loaded game page needs,
+        // so the menus never download it. (A manual 'babylon' chunk also swallowed Vite's
+        // dynamic-import helper, which made the menus preload all of Babylon.)
         manualChunks(id) {
-          if (id.includes('@babylonjs')) return 'babylon';
-          if (id.includes('node_modules')) return 'vendor';
+          if (id.includes('node_modules') && !id.includes('@babylonjs')) return 'vendor';
         },
       },
     },

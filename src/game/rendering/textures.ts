@@ -26,6 +26,13 @@ function shade(hex: string, f: number, alpha = 1): string {
   return `rgba(${c(r)},${c(g)},${c(b)},${alpha})`;
 }
 
+let lowQuality = false;
+
+/** Map textures at half size with no anisotropic filtering (low-end GPUs). Set before a scene is built. */
+export function setTextureQuality(q: 'low' | 'high') {
+  lowQuality = q === 'low';
+}
+
 function makeTexture(
   scene: Scene,
   name: string,
@@ -34,6 +41,8 @@ function makeTexture(
   hasAlpha = false,
   wrap = true,
 ): DynamicTexture {
+  // only the tiling map textures are worth shrinking; sprites and the sky are already small
+  if (lowQuality && wrap && size >= 256) size /= 2;
   const tex = new DynamicTexture(name, { width: size, height: size }, scene, true);
   const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
   draw(ctx, size);
@@ -41,7 +50,7 @@ function makeTexture(
   tex.hasAlpha = hasAlpha;
   tex.wrapU = wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
   tex.wrapV = wrap ? Texture.WRAP_ADDRESSMODE : Texture.CLAMP_ADDRESSMODE;
-  tex.anisotropicFilteringLevel = 8;
+  tex.anisotropicFilteringLevel = lowQuality ? 1 : 8;
   return tex;
 }
 

@@ -1,201 +1,256 @@
 # Tactical Aim Lab
 
-A browser-based 3D tactical FPS aim-practice lab inspired by Valorant. Open it in Chrome, pick a map location, set your sensitivity and crosshair, choose a weapon and fight AI bots that peek, swing, spray and reposition the way real players do.
+A browser-based 3D aim-practice lab inspired by Valorant. Open it in Chrome, pick a map and a spot to hold, set your sensitivity and crosshair, choose a weapon and fight AI bots that peek, swing, spray and reposition the way real players do. No install, no account: everything runs in the page.
 
-It's a fan-made training tool and isn't affiliated with Riot Games. The maps, weapons and the fallback training-dummy bots are original and generated procedurally at runtime. The bots use the "Sage | Valorant" model by ILilMitch (CC BY 4.0, made from Riot Games assets under Riot's fan-content policy, see `public/models/README.md`), and the Vandal, Phantom and Sheriff use community skin models (Gaia Vandal and Arcane Sheriff by ILilMitch, Reaver Phantom by MisterM4n, all CC BY 4.0). The animated first-person arms use the "M4 - FPS Weapon Animations Pack (v.1)" by BarcodeGames (CC BY 4.0, rifle removed), and the alternative posed arms use "First-Person Arm & Hand - Fingerless Gloves" by Exactly (CC BY 4.0). Keep the project free and non-commercial. Gunshots are synthesised at runtime too, except the Vandal, Phantom and Sheriff, which use recordings supplied by the project owner (`public/sounds/`, see below).
+![Holding A Main on Vellora with the Vandal](docs/screenshots/gameplay.png)
 
-## Run it
+It's a free, non-commercial fan project and isn't affiliated with Riot Games. The maps, guns, sounds and fallback bots are original and generated at runtime. Some optional models are community fan art under CC BY 4.0 (credits at the end and in `public/models/README.md`).
+
+---
+
+## 1. What we're trying to build
+
+Most aim trainers drill clicking on dots. In a real Valorant round the hard part is different: you hold an angle, an enemy jiggles to bait your shot, shoulder-peeks, swings wide or sprays from a crouch, and you have to react with the right crosshair placement, a counter-strafe and a controlled first bullet. **The goal of Tactical Aim Lab is to recreate those duels** so they can be practised over and over, measured, and improved.
+
+What that means in practice:
+
+- **Bots that play like people.** The bots are the core of the project. They hide behind real cover, peek in different styles (jiggle, shoulder bait, wide swing, crouch spray, ADAD), have human reaction times and aim error, stop before shooting, control recoil, take cover when hurt and re-peek.
+- **The game feel has to match.** The sensitivity scale is Valorant's (0.07° per mouse count), movement speeds, counter-strafing, first-shot accuracy, running inaccuracy and spray patterns follow the same rules, so practice carries over.
+- **Real locations.** Eight original maps are laid out like the competitive maps they're inspired by, each with practice locations (A Main, Mid, B Long…), attack and defend spawns, and enemy positions that are proven to be peekable.
+- **Measurable progress.** Every shot is recorded: accuracy, headshot rate, reaction time, time to kill, first-shot versus spray accuracy, per-weapon results, with a report after each session and charts over days and weeks.
+- **Runs anywhere a browser runs.** No download, no anti-cheat, no game client. It can even be built into one self-contained HTML file.
+- **Clean assets.** Nothing is extracted from the game. Geometry, textures and sounds are made in code; optional models are licensed community work, and recordings are only ones the owner has the rights to.
+
+## 2. Run it
 
 ```bash
-npm install
+npm install          # or: bun install
 npm run dev          # http://localhost:5173
 npm run build        # typecheck + production build into dist/
 npm run build:single # one self-contained HTML file in dist-single/ (no models or recordings)
 npm run preview      # serve the production build
 npm run typecheck    # tsc --noEmit
-npm test             # unit tests (vitest)
+npm test             # unit and map tests (vitest)
 ```
 
-Headless gameplay smoke test (Chromium + SwiftShader, needs Playwright installed globally):
+Headless gameplay smoke tests (Chromium with SwiftShader; Playwright installed globally):
 
 ```bash
 npm run build && npx vite preview --port 4173 &
-node scripts/e2e.mjs http://localhost:4173/ e2e-shots
+node scripts/e2e.mjs http://localhost:4173/ e2e-shots          # movement, aiming, shooting, bots, reload
+MAPS='[{"id":"vellora","locations":["a-main","mid","b-main"]}]' \
+  node scripts/e2e-maps.mjs http://localhost:4173/ e2e-maps    # every listed map/location peeks correctly
 ```
 
-## Stack
+### Controls
 
-- **Babylon.js 9** for rendering, the camera, materials, shadows and particles. Babylon is imported by deep paths (`src/game/rendering/babylon.ts`) so the bundle stays tree-shaken.
-- **TypeScript** throughout.
-- **React 19, Vite 8, Tailwind CSS 4 and Lucide** for the UI.
-- **Web Audio API** for HRTF positional audio. Every sound is synthesised at load, so the app works with no audio files; recordings in `public/sounds/` are optional overrides.
-  - Gunshots are built from layers (`src/game/audio/gunSynth.ts`): supersonic crack, muzzle blast, body punch, sub thump, mechanical action, early wall reflections and a convolution reverb tail. They're rendered with an `OfflineAudioContext`, with 4 variations per weapon so sprays don't sound looped.
-  - Enemy gunshots play the same recording, at the same clarity and level, as the player's own gun of that type (bots carry the Vandal). They're only panned left/right towards the shooter and get a little quieter with distance (down to half volume): no muffling, wall filtering or echo. Other enemy sounds (footsteps, bullet whizz) are still positioned in 3D, muffled with distance and behind walls, and sent to an environment reverb.
-  - Recorded takes in `public/sounds/` (listed in its `manifest.json`) override the synthesis per slot: each gun, footsteps, reloads (shared or per gun), the headshot ping and kill-streak sounds 1–5 (shared or per gun). The slots are listed in `public/sounds/README.md`. Recordings are cleaned up when they load: leading and trailing silence is trimmed, a long footstep take is cut into single steps, and footsteps, kill sounds and reloads each play one voice at a time (a new one fades out the previous one) so they never pile up. The Vandal, Phantom and Sheriff shots currently use 3–4 takes each, cut from the owner's recordings by `scripts/extract-gun-samples.py`; every other slot is empty and stays synthesised. The single-file build leaves these files out.
-- **Pointer Lock API** with `unadjustedMovement` (raw input) for aiming.
+| Action                                                      | Key                               |
+| ----------------------------------------------------------- | --------------------------------- |
+| Move                                                        | W A S D (or arrow keys)           |
+| Walk                                                        | Shift                             |
+| Crouch                                                      | Ctrl or C                         |
+| Jump                                                        | Space                             |
+| Fire                                                        | Left mouse                        |
+| Aim down sights (rifles, Sheriff) / 3-round burst (Classic) | Right mouse                       |
+| Reload                                                      | R                                 |
+| Primary / sidearm                                           | 1 / 2, or the mouse wheel to swap |
+| Pause                                                       | Esc                               |
+
+## 3. How it's built
+
+### 3.1 Stack
+
+- **Babylon.js 9** renders the world: camera, PBR and standard materials, shadows, particles, glTF models. It is imported by deep paths (`src/game/rendering/babylon.ts`) so the bundle only contains what is used.
+- **TypeScript** everywhere, strict mode.
+- **React 19 + Vite 8 + Tailwind CSS 4 + Lucide** for the menus, settings, HUD and reports.
+- **Web Audio API** for all sound, with HRTF 3D panning.
+- **Pointer Lock API** with `unadjustedMovement` (raw mouse input).
 - **localStorage** for settings, crosshair presets and session history.
+- **Vitest** for unit and map tests, **Playwright** scripts for in-browser smoke tests.
 
-## Architecture
+There are no other runtime dependencies: physics, AI, navigation, audio synthesis and the map builder are all written for this project.
+
+### 3.2 Project layout
 
 ```
 src/
-  app/App.tsx                 shell + navigation (8 pages)
+  app/App.tsx                 shell + navigation
   pages/                      Home, Practice, Maps, Weapons, Crosshair, Sensitivity, Statistics, Settings, Game
-  components/                 UI kit, MapPreview (top-down SVG + live field-of-view), charts, HUD, report
-  hooks/useAppStore.ts        tiny external store (useSyncExternalStore) + persistence
+  components/                 UI kit, MapPreview (top-down SVG with live field of view), charts, HUD, session report
+  hooks/useAppStore.ts        small external store (useSyncExternalStore) with persistence
   services/storage.ts         versioned localStorage with defaults merging
-  settings/defaults.ts        settings, difficulty presets, eDPI / cm-per-360 maths
+  settings/defaults.ts        default settings, difficulty presets, graphics presets, eDPI / cm-per-360 maths
   types/                      shared interfaces (weapon, bot, map, practice, crosshair, sensitivity, stats, HUD)
   game/
-    engine/GameEngine.ts      the only React↔Babylon boundary: create/start/pause/end/updateSettings + events
-    engine/RenderHost.ts      one Babylon engine + canvas reused by every session (compiled shaders stay cached)
+    engine/GameEngine.ts      the only React↔game boundary: create/start/pause/end/updateSettings + events
+    engine/RenderHost.ts      one Babylon engine + canvas reused by every session
     core/Input.ts             keyboard/mouse, pointer lock, raw deltas consumed once per frame
-    physics/CollisionWorld.ts AABB world: slab raycasts, kinematic movement (slide, step-up, ground snap), hitboxes
-    player/PlayerController   Valorant-scale look (0.07°/count), run/walk/crouch/jump, counter-strafe friction
-    weapons/                  per-weapon configs + recoil patterns, WeaponSystem (spread, recoil, ADS, burst, reload), ViewModel,
-                              AnimatedArms (animated arms pack), FirstPersonArms (IK arms), ArmModel (skins fp-arms.glb at load)
-    bots/
-      Bot.ts                  entity: perception, reaction delay, aim-error model, bursts, recoil control, movement
-      BotVisual.ts            BotView interface + procedural blocky dummy (fallback) with enemy highlight
-      AgentVisual.ts          rigged agent model (public/models/sage.glb) posed in code: crouch, walk cycle,
-                              aim pitch, two-bone IK for both arms on the rifle and both legs
-      behaviors/              PeekBehavior (angle-hold/jiggle modes), DeathmatchBehavior (roam/hunt/cover/re-peek)
-      perception/             FOV + multi-point raycast line of sight, peek-line exposure analysis
-      navigation/             grid A* with step heights, drops, corner rules and path smoothing
-    maps/                     grid-authored maps → merged boxes (render + collision + nav from one source)
+    physics/CollisionWorld.ts AABB world: slab raycasts, kinematic movement, hitboxes
+    player/PlayerController   look, run/walk/crouch/jump, counter-strafe friction
+    weapons/                  weapon configs + recoil patterns, WeaponSystem, ViewModel, skins, three kinds of arms
+    bots/                     Bot entity, visuals, behaviours, perception, navigation
+    maps/                     grid map definitions, map builder, enemy-spot finder, generated spots
     practice/                 PracticeDirector (modes, spawns, respawns), SessionTracker (stats + scoring)
-    rendering/                MapRenderer (batched world-UV geometry), procedural textures, pooled Effects
-    audio/AudioEngine.ts      synthesised SFX, HRTF panning, distance and wall-occlusion filtering, reverb send
-    audio/gunSynth.ts         layered offline-rendered gunshots (crack/blast/body/sub/mechanics/reflections/reverb)
-    hud/crosshairRenderer.ts  screen-space crosshair, shared by the editor preview and the in-game HUD
-    hud/Minimap.ts            rotating minimap drawn on the overlay canvas (pre-rendered from the map grid)
+    rendering/                MapRenderer, procedural textures, pooled effects, glTF helpers
+    audio/                    AudioEngine (playback, 3D, recordings) and gunSynth (synthesised gunshots)
+    hud/                      crosshair renderer (shared with the editor) and minimap
 public/
   favicon.svg                 crosshair icon (inlined as a data URI in the single-file build)
   models/                     agent, arms and weapon-skin GLBs with their credits (README.md)
-  sounds/                     optional recordings that replace synthesised sounds (README.md lists the slots)
+  sounds/                     recordings that replace synthesised sounds (README.md lists the slots)
+docs/screenshots/             images used in this README
 scripts/                      single-file build, Playwright smoke tests, asset preparation
-tests/                        vitest unit tests; tests/tools/gen-spots.test.ts regenerates enemy spots
+tests/                        unit and map tests; tests/tools/gen-spots.test.ts regenerates enemy spots
 ```
 
-React never drives the frame loop. `GameEngine` runs its own `requestAnimationFrame` loop: mouse look is applied first for latency, then fixed 120 Hz simulation substeps (player, weapons, bots), then render. React receives throttled HUD snapshots at about 12 Hz plus discrete events (kill feed, status, session end). The crosshair, hit markers and damage-direction arcs are drawn every frame onto a 2D overlay canvas by the engine.
+### 3.3 The frame loop and the React boundary
 
-## Phase report: MVP (Phases 1–3, plus the first slice of 4–6)
+React never drives the game. `GameEngine` owns a `requestAnimationFrame` loop:
 
-### Implemented and verified working
+1. **Mouse look first.** Raw mouse deltas are applied to the camera before anything else, so aiming has the lowest possible latency.
+2. **Fixed 120 Hz simulation.** The player, weapons, bots and practice director advance in fixed substeps, so fire rates, movement and AI timing don't depend on the frame rate.
+3. **Render.** Babylon draws the scene; the crosshair, hit markers, damage-direction arcs and minimap are drawn every frame onto a 2D overlay canvas.
 
-Each item below was verified by the automated tests in this repo.
+React only receives throttled HUD snapshots (about 12 per second) and discrete events (kill feed, status changes, session end). The engine and canvas are created once (`RenderHost`) and reused by every session, and compiled shaders are kept (`Effect.PersistentMode`), so only the first session pays the shader-compile cost. A session can be torn down while it's still loading, which keeps React StrictMode's double mount from building two engines.
 
-**Movement**
-- First-person movement with WASD, walk (Shift), crouch (Ctrl or C) and jump. Running speed is 5.85 m/s (raised from 5.4 m/s); walking and crouching scale from it.
-- Accelerate and decelerate model with a fast counter-strafe stop. Stopping from full speed to accurate speed takes under 80 ms (unit test).
-- Mouse look on Pointer Lock with raw input.
-- Valorant sensitivity scale: 1000 counts at 0.4 sensitivity rotates exactly 28° (e2e).
-- Horizontal, vertical and ADS multipliers, plus invert Y.
-- AABB collision with wall sliding, 0.4 m step-up, stair snapping and a ceiling check before standing up.
+### 3.4 Player movement and aiming
 
-**Maps**
-- Eight original maps, each with its own layout, palette, callouts and 3–5 practice locations, plus attack and defend spawns for each location. Maps are built on a grid of 1.5 m cells (`CELL` in `src/game/maps/GridMap.ts`, previously 2 m), so every room, corridor and gap between cover is 25% smaller than the original layouts while the layouts and all heights stay the same. Vellora's hand-placed positions keep their distance to the wall or crate they hug when the cell size changes.
+- `PlayerController` models acceleration and friction rather than instant velocity. Running speed is 5.85 m/s; walking and crouching scale from it. Releasing a key applies a strong counter-strafe friction, so stopping from full speed to "accurate" speed takes under 80 ms (unit test).
+- The player is an upright box moved kinematically against the map's merged boxes (`CollisionWorld`): wall sliding, 0.4 m step-up, ground snapping on stairs, and a ceiling check before standing up from a crouch.
+- Look uses Valorant's scale (sensitivity × 0.07° per count), with separate horizontal, vertical and ADS multipliers and invert Y. The Sensitivity page converts from other games and shows eDPI and cm/360°.
 
-| Map | Inspired by | Practice locations |
-|---|---|---|
-| Vellora | Ascent | A Main, Mid, B Main |
-| Dunehold | Bind | A Short (via Showers), A Long, Hookah (door + window), B Long |
-| Sanctum | Haven | A Long, A Short, Mid, Garage, C Long (three sites) |
-| Kitsune | Split | A Main (ramps to a raised site under A Heaven), Mid (raised Mid Top), B Main (under B Heaven) |
-| Tamarind | Lotus | A Main, B Main, C Main over the C Mound (three sites) |
-| Permafrost | Icebox | A Main, Mid (Boiler), B Main into container mazes |
-| Coralis | Breeze | A Main into a huge open site, Mid, B Main through the B Elbow |
-| Goldline | Sunset | A Main via the A Elbow, Mid (Market/Courtyard), B Main |
+### 3.5 Weapons
 
-- Vellora's enemy positions were placed by hand. On the other seven maps they are generated by `src/game/maps/spotFinder.ts`. It scans every cover face and keeps positions where a bot is fully hidden, becomes visible after a short strafe, and stands in front of the player. Positions that work from every spawn of a side rank first.
-- Long, bare corridors are dressed when the map is built (`dressMap` in `src/game/maps/MapData.ts`, all deterministic):
-  - Wall tops vary between 6, 7.2 and 8.4 m in 4×4-cell blocks, so skylines step instead of forming one flat canyon.
-  - Corridors at least 9 cells long and up to 4 wide get archways (a lintel from 3.6 m up) every 5 cells and low crates against alternating walls every 7 cells. Both are real geometry: they block bullets, sight and movement. Nothing is placed within 2.5 m of a spawn or 1.6 m of a bot's peek line.
-  - Walls facing walkable floor get visual-only facade detail (pilasters, framed doors with a step and lamp, windows with sills, wall lamps). It sits within 12 cm of the wall and has no collision.
-- After changing a map's geometry or spawns, regenerate with `GEN_SPOTS=1 npx vitest run tests/tools/gen-spots.test.ts`. The output goes to `src/game/maps/generated/*.json`.
-- `npm test` checks every map:
-  - The border is closed.
-  - Every spawn is in free space and standing on the ground.
-  - Every spawn has at least 3 peekable enemy positions.
-  - Every callout can be reached by navigation.
+- Four weapons live in `src/game/weapons/weaponConfigs.ts`: Vandal (9.75 rounds/s, 25 rounds, 160/40/34 head/body/legs at every range), Phantom (11 rounds/s, 30 rounds, damage falls off at 15 m and 30 m), Sheriff (4 rounds/s, 6 rounds) and Classic (6.75 rounds/s, 12 rounds, right-click burst).
+- `WeaponSystem` handles firing on a carried sub-frame cooldown (so the fire rate is exact at any frame rate), spread (base, crouch, running, in the air, and firing error that grows per shot), hand-authored recoil patterns with recovery, ADS (1.25× zoom), bursts, reloads, auto-reload and equip times.
+- Shots are hitscan: a ray from the eye through the spread cone is tested against the world and each bot's hitboxes (head, body, legs, following crouch). The closest hit wins, so walls stop bullets.
+- The reload animation and its sound cues run faster than the reload (55% of the reload time, at most 1.3 s); the gun then waits, ready, until the reload completes.
+- **Gun models.** The Vandal, Phantom and Sheriff can use skin GLBs. Each is placed from grip, handguard, muzzle and sight points measured on the model, so the hands, muzzle flash, tracers and sights line up. The Classic and the "simple guns" setting use guns built from boxes.
+- **First-person arms** (Settings → Graphics → First-person arms):
+  - _Animated_ (default): an animation pack of gloved arms. `AnimatedArms.ts` evaluates its Draw, Fire, Reload and Reload_Empty clips from game state every frame; the game's gun rides the pack's weapon joint and the magazine follows the pack's magazine joints. The rig is turned so the barrel points at the crosshair, and ADS blends the rig to centre the sights. Pistols have no clips, so the arms are solved onto the pistol with two-bone IK.
+  - _Rigged arms_: a static arm model that `ArmModel.ts` cuts up and skins in code at load (forearm, hand and finger bones), then poses with IK every frame.
+  - _Simple_: block hands. The single-file build uses arms built from simple shapes.
+- Effects: muzzle flash with a light, tracers (not on the suppressed Phantom), wall decals, sparks, hit puffs and view kick, all from pooled objects (`rendering/Effects.ts`).
 
-**Weapons**
-- Vandal and Phantom (primaries), Classic and Sheriff (sidearms).
-- Each weapon has its own fire rate, magazine, reload, damage by range, first-shot accuracy, spray-spread growth, movement and air inaccuracy, and a hand-authored recoil pattern with recovery.
-- Headshots, body shots and leg shots are separate hitboxes that follow crouch.
-- ADS with 1.25× zoom on rifles and the Sheriff. The Classic right-click fires a 3-round burst.
-- Reload with sound cues (or one recorded reload file per gun), auto-reload when the magazine is empty, weapon switching with equip time (1 / 2, or the mouse wheel to swap; one swap per wheel notch). The reload animation and its sound cues run faster than the reload itself (55% of the reload time, at most 1.3 s); the gun then waits, ready, until the reload completes, so reload times are unchanged.
-- Weapon skins: the Vandal (Gaia), Phantom (Reaver) and Sheriff (Arcane) use GLB models from `public/models/weapons`, placed from measured grip, handguard, muzzle and sight points so the hands, muzzle flash, tracers and aim-down-sights line up. The Vandal's magazine drops on reload and the Sheriff's front assembly spins after each shot. Sage bots carry the Vandal skin. Settings → Graphics → Gun models switches back to the simple guns; the Classic has no skin.
-- First-person arms (Settings → Graphics → First-person arms):
-  - **Animated** (default): the "M4 - FPS Weapon Animations Pack (v.1)" by BarcodeGames (CC BY 4.0, `public/models/fp-arms-anim.glb`, prepared by `scripts/prepare-fp-arms.mjs`), a rigged pair of gloved forearms with Draw, Fire, Reload and Reload_Empty animations. `src/game/weapons/AnimatedArms.ts` evaluates the clips from game state every frame: Draw follows the equip timer, Fire restarts on each shot, Reload (or Reload_Empty when the magazine was empty) follows the reload, played up to 2.2× faster than authored and finishing at 80% of the reload time, and the first Fire frame is the idle pose. The pack's rifle meshes are removed and the game's gun rides the pack's weapon joint, its grip on the M4's grip and pitched a few degrees so its handguard meets the left hand. The gun's magazine follows the pack's magazine joints, so the left hand pulls the old one and seats the new one (the Vandal skin and the simple guns have a separate magazine; the Phantom and Sheriff skins don't). The rig is raised and turned right about its spine so the gun sits lower right in this game's wide field of view, then turned about the gun so the barrel runs parallel to the view and points at the crosshair; aiming down sights moves the whole rig to centre the sights. Pistols have no clips in the pack: the pistol is placed as before, the right hand takes the same hold on its grip that the idle pose has on the M4, and the left arm is solved with two-bone IK to cup it. Synthesized reload cues follow the reload clip.
-  - **Rigged arms**: the "First-Person Arm & Hand - Fingerless Gloves" model (`public/models/fp-arms.glb`, by Exactly, CC BY 4.0). The file has no skeleton, so `src/game/weapons/ArmModel.ts` cuts out its two arms at load and skins them in code: two forearm bones (so the forearm can stretch), the hand, and three bones for each finger and the thumb, with weights from each vertex's distance to the bone segments. Each frame two-bone IK puts the right palm against the grip and the left palm flat against the underside of the handguard (measured from each gun's own mesh when it's built, so it fits skins and simple guns alike), or cups the right hand on pistols. The hands then turn to wrap the gun: the left fingers curl up the handguard's right side with the thumb along its left side. The model has no upper arm, so the forearm is laid along the IK forearm and stretched (up to 1.85×) only as far as needed to keep its cut-off elbow end outside the screen.
-  - Without either file (and in the single-file build) the same posing drives built-in arms made from simple shapes; **Simple hands** switches to the old block hands.
-- Muzzle flash with a light, tracers (the Phantom is suppressed and has none), wall decals, spark and hit particles, and view kick.
+### 3.6 Bots
+
+A bot is one `Bot` entity (state, perception, aim, shooting, movement) plus a _behaviour_ that decides what it wants to do, plus a _visual_.
+
+- **Perception** (`bots/perception/visibility.ts`): a ~130° field of view and line of sight tested with raycasts to seven points on the body (head, both cheeks, chest, both shoulders, legs), so bots can't see or shoot through walls but do spot a shoulder or head poking out. The same code analyses each peek line to find where a bot is hidden and where it becomes visible.
+- **Aim model**: a reaction delay after the player becomes visible (650 / 420 / 270 / 175 ms for Easy / Normal / Hard / Radiant), an aim error that starts wide and converges, a head-or-body choice, bursts with pauses so recoil resets, recoil compensation, and a stop before shooting (counter-strafe discipline). Headshot chance (how often a bot aims for the head; at 0 bots deal no headshot damage) and a bot damage multiplier are set per difficulty and can be changed on the Practice page. Custom sliders cover reaction, accuracy, peek frequency and duration, speed, aggression, burst length and crouch frequency.
+- **Peek behaviour** (`behaviors/PeekBehavior.ts`, used in Angle Holding and Jiggle training): a state machine (hidden → prep → out → hold/engage → back, with relocation to another free spot) that plays full peeks, jiggles, shoulder baits, wide swings, crouch sprays and ADAD strafes.
+- **Deathmatch behaviour**: patrols or hunts the player, hears gunfire and footsteps, chases the last known position, takes cover when low on health and re-peeks. Paths come from grid A\* (`navigation/`) with step heights, drops, corner rules and path smoothing.
+- **Size**: bots are person-sized (1.8 m). One constant, `BOT_SCALE` in `visibility.ts`, scales the model, hitboxes, collision, eye height and visibility checks together; regenerate enemy spots after changing it.
+- **Visuals**: by default a rigged agent model with no animations, posed in code every frame (crouch, walk cycle with foot IK, aim pitch, both hands IK-solved onto the rifle). Posing is skipped off-screen and runs at a third of the rate far away. The fallback is a procedural training dummy. Both have an enemy highlight.
+
+### 3.7 Maps
+
+- Maps are written as **character grids** (`src/game/maps/<theme>/<map>.ts`) with a small builder (`GridBuilder`): `#` wall, `.` floor, `c`/`C`/`D` low crate, crate and stack, `P` pillar, `r` rail, `=` arch, `w` window, and digits for raised floors. Each cell is 1.5 m (`CELL` in `GridMap.ts`).
+- `MapData` turns the grid into **merged boxes** once, and the same boxes feed rendering, collision and navigation, so what you see is what blocks you. Corridors are then dressed deterministically: stepped wall heights, archways and low crates in long corridors (real geometry), and visual-only facade detail (doors, windows, lamps, pilasters).
+- Each map declares practice **locations** with attack and defend spawns. Vellora's enemy spots are placed by hand. For the other seven, `spotFinder.ts` scans every cover face and keeps positions where a bot is fully hidden, becomes visible after a short strafe, and stands in front of the player; it tops up the picks until every spawn has at least 3 usable spots (the map test checks this) and stores them in `src/game/maps/generated/*.json`. Regenerate after changing geometry, spawns or bot size:
+
+  ```bash
+  GEN_SPOTS=1 npx vitest run tests/tools/gen-spots.test.ts
+  ```
+
+| Map        | Inspired by | Practice locations                                                     |
+| ---------- | ----------- | ---------------------------------------------------------------------- |
+| Vellora    | Ascent      | A Main, Mid, B Main                                                    |
+| Dunehold   | Bind        | A Short (via Showers), A Long, Hookah (door + window), B Long          |
+| Sanctum    | Haven       | A Long, A Short, Mid, Garage, C Long (three sites)                     |
+| Kitsune    | Split       | A Main (under A Heaven), Mid (raised Mid Top), B Main (under B Heaven) |
+| Tamarind   | Lotus       | A Main, B Main, C Main over the C Mound (three sites)                  |
+| Permafrost | Icebox      | A Main, Mid (Boiler), B Main into container mazes                      |
+| Coralis    | Breeze      | A Main into a huge open site, Mid, B Main through the B Elbow          |
+| Goldline   | Sunset      | A Main via the A Elbow, Mid (Market/Courtyard), B Main                 |
+
+### 3.8 Practice modes and statistics
+
+- **Angle Holding**: hold a location while bots peek with the behaviour you pick (or a mix). Bots that peek and escape count against you.
+- **Jiggle Peek Training**: bots jiggle, shoulder-bait and then commit; wasted bait shots are tracked.
+- **Basic Deathmatch**: up to 10 bots that roam, hunt and respawn.
+- **Spray Control**: no bots. Spray at any wall and pull against the recoil. `SprayTrainer` groups shots into sprays (five bullets or more) and scores each from 0 (mouse held still) to 100 (recoil fully cancelled) by how far the centre of the spread cone (aim movement plus recoil pattern) strays from the first-shot point; random spread is plotted but not scored. A panel on the 2D overlay plots the bullets, your control line and the uncontrolled pattern live.
+
+`PracticeDirector` owns the bots, assigns spots (never one whose peek line passes within 6 m of your spawn), handles deaths and respawns. `SessionTracker` records shots, hits by zone, reaction time (bot visible → your first hit), time to kill, first-shot / spray / moving accuracy, kills, deaths, damage, escapes, bait shots and a per-weapon breakdown, and computes a score. Each session ends with a report; history (up to 300 sessions) feeds the Statistics page's daily and weekly charts.
+
+### 3.9 Rendering
+
+- `MapRenderer` batches the merged boxes into a few meshes with world-space UVs, so textures tile evenly at any box size. Wall, floor, crate, metal and stone textures and the sky are drawn procedurally on canvases (`rendering/textures.ts`), seeded per map.
+- Graphics presets (Potato / Low / Medium / High) set shadows, resolution scale, anti-aliasing, effects, post-processing, lighting, texture size and which bot, gun and arm models load. Potato is for machines without a dedicated GPU. On first run `settings/deviceProfile.ts` reads the GPU name and picks a preset; Settings shows what it found.
+- Adaptive resolution (on by default) lowers the render scale in steps while the frame rate is under 60 (or the FPS limit) and raises it again afterwards, down to half the chosen scale. An FPS limit (30 / 60 / 120 / 144) is available for laptops.
+- The game page and Babylon load on demand, so the menus don't download the 3D engine; it is fetched in the background once the page is idle.
+- WebGPU can be chosen in Settings and falls back to WebGL 2.
+- The minimap is pre-rendered from the grid and rotated so your facing is up; nearby enemies are shown as a training aid (range adjustable).
+
+### 3.10 Audio
+
+- `gunSynth.ts` builds each gunshot from layers (supersonic crack, muzzle blast, body punch, sub thump, mechanical action, early reflections, convolution reverb) and renders 4 variations per weapon with an `OfflineAudioContext`.
+- `AudioEngine.ts` plays everything: footsteps, jumps, landings, reload cues, hit and headshot sounds, kill-streak chimes, bullet whizz. Enemy sounds are positioned in 3D (HRTF), muffled with distance and behind walls, and sent to a reverb; enemy gunshots use the same clean sound as your own gun, only panned and slightly quieter with distance.
+- Any slot can be replaced by recordings listed in `public/sounds/manifest.json` (see `public/sounds/README.md`). Recordings are trimmed of silence on load, long footstep takes are cut into single steps, and footsteps, reloads and kill sounds play one voice at a time. In this repository the Vandal, Phantom and Sheriff shots, footsteps, the reload and kill-streak sounds 1–5 use the owner's recordings; everything else is synthesised.
+
+### 3.11 UI, settings and storage
+
+- Pages: Home, Practice (map, location, side, spawn, mode, behaviour, bot count, difficulty, weapons), Maps, Weapons, Crosshair (full editor with presets and import/export codes), Sensitivity, Statistics, Settings (graphics, audio, HUD, controls, data) and Game.
+- Settings live in a small external store (`useAppStore`) saved to versioned localStorage keys; stored values are merged with the defaults so new settings appear without wiping old ones.
+- Robustness: the game pauses on Esc, pointer-lock loss, window blur or a hidden tab; pointer lock is requested before fullscreen; WebGL context loss and missing WebGL show a clear message; audio starts on the first click; fullscreen uses Keyboard Lock so Ctrl+W doesn't close the tab while crouch-walking.
+
+### 3.12 Builds and assets
+
+- `npm run build` produces `dist/` for any static host (the project deploys to Vercel).
+- `npm run build:single` builds with `vite.single.config.ts` and inlines all JS, CSS and the favicon into one HTML file. That build sets `__LOCAL_MODELS__` to false, so it never loads GLB models or recordings: bots are training dummies, arms are built from shapes and all sounds are synthesised.
+- Model preparation is scripted: `scripts/prepare-agent-model.mjs` and `scripts/prepare-fp-arms.mjs` (glTF-Transform), and `scripts/extract-gun-samples.py` cuts single shots out of longer recordings.
+
+### 3.13 Testing and debugging
+
+- `npm test` checks the collision world, hitboxes, weapons (fire rate at any step size, first-shot accuracy, spray climb, recoil recovery, running inaccuracy and counter-strafe recovery), sensitivity maths, crosshair codes, audio clean-up, and every map: closed border, spawns in free space on the ground, at least 3 peekable enemy positions per spawn, every callout reachable.
+- `scripts/e2e.mjs` and `scripts/e2e-maps.mjs` drive a real browser session.
+- In a running game, `window.__TAL__.debug` exposes helpers such as `state()`, `teleport()`, `setView()`, `aimAtBot()`, `hitboxes(true)`, `timeScale()` and `godMode()`.
+
+### 3.14 Extending it
+
+- **New map**: add a grid file under `src/game/maps/`, register it in `maps/registry.ts`, declare its locations and spawns, run the spot generator, then `npm test`.
+- **New weapon**: add its id to `WeaponId` in `src/types`, a config with stats and a recoil pattern in `weaponConfigs.ts`, and optionally a skin entry in `WeaponSkins.ts` and sound slots in the manifest.
+- **New sound**: drop the file in `public/sounds/` and list it under its slot in `manifest.json`.
+
+## 4. Known issues and limits
+
+- The animation pack has no ADS, walking or pistol animations: ADS moves the whole rig, and pistols are held by IK, so pistol reloads only dip the gun. Rifle reloads were authored for an M4, so on skins without a separate magazine the left hand mimes the change.
+- Bots all carry a Vandal, don't fight each other in Deathmatch, and fall over with a simple tilt (no ragdoll). The agent model's cloth, hair and fingers don't move.
+- Navigation is grid A\*, not a Recast navmesh.
+- The minimap doesn't show height.
+- The scoped-sensitivity setting is stored but unused (there's no sniper yet).
+- Statistics are kept in localStorage (300 sessions), not IndexedDB.
+- WebGPU and real-GPU frame rates haven't been measured; automated runs use software rendering. Use the Potato or Low preset on weak machines.
+- In a sandboxed iframe Pointer Lock may be blocked; the game falls back to free-mouse aiming. Firefox has no raw pointer input, so OS acceleration may apply.
+
+## 5. What we can do next
+
+**Training content (most value for players)**
+
+- **Spray transfer**: extend Spray Control with transfers between two or three targets.
+- **Counter-strafe trainer**: shows your speed at the moment of each shot and scores how often you fired while accurate.
+- **Flick and micro-adjust drills** on the same maps, plus a crosshair-placement score (how far you had to move to the bot's head when it appeared).
+- **Scenario packs**: retake and post-plant setups with several bots peeking in sequence, off-angles, and bots that peek together.
+- **Daily routine and goals**: a short warm-up playlist, personal bests and targets ("reaction under 250 ms", "60% first-shot headshots").
 
 **Bots**
-- Bots are person-sized (1.8 m, the same as the player). One constant (`BOT_SCALE` in `src/game/bots/perception/visibility.ts`) scales the model, hitboxes (head, body, legs), collision size, eye height and the visibility checks together; the player's own hitboxes stay person-sized. Enemy hiding spots are generated for that size, so regenerate them after changing it.
-- Stationary angle holding, jiggle peek, shoulder peek (bait), wide swing (backs up, then sprints wide), crouch spray (with recoil compensation), counter-strafe ADAD, and repositioning to another free spot.
-- Perception uses a ~130° field of view with multi-point raycast line of sight, so bots can't see or shoot through walls.
-- Reaction delay, an aim error that converges over time, and a head-or-body aim choice.
-- Bots stop before shooting (counter-strafe discipline) and pause between bursts so recoil resets.
-- Deathmatch AI: patrols or hunts the player, hears gunfire and footsteps, chases the last known position, takes cover when low on health and re-peeks. Navigation is grid A*.
-- Bots are drawn with a rigged agent model (Sage). It has no animations, so it is posed in code every frame: the pelvis drops for crouching, legs use two-bone IK to keep feet planted or step along the movement direction, the spine and head follow the aim pitch, and both hands are solved onto the rifle. The pose only re-solves when its inputs change, off-screen bots are skipped and far ones update at a third of the rate. The model is scaled so its head sits inside the head hitbox (`debug.hitboxes(true)` shows them). Settings → Graphics → Bot model switches back to the blocky dummy.
-- Difficulty presets (Easy, Normal, Hard, Radiant) plus custom sliders for reaction time, accuracy, peek frequency, peek duration, speed, aggression, burst length and crouch frequency.
 
-**Practice modes**
-- **Angle Holding**: behaviour can be selected, and escapes are penalised.
-- **Jiggle Peek Training**: jiggles, shoulder baits and commits. Wasted bait shots are tracked.
-- **Basic Deathmatch**: up to 10 bots with respawns.
+- Weapon variety (Phantom, Sheriff, Spectre) and per-bot personalities.
+- Bots that fight each other in Deathmatch, use sound to rotate, and fake peeks with footsteps.
+- Real animation clips (walk, run, strafe, crouch, reload) and ragdolls on death.
 
-**Analytics**
-- Shots, hits, headshots, body shots, leg shots and accuracy.
-- Reaction time (from the bot appearing on screen to your first hit) and time to kill.
-- First-shot, spray and moving-shot accuracy.
-- Kills, deaths, damage dealt and taken, escapes and bait shots, plus a per-weapon breakdown and score.
-- A session report at the end of each session. History persists in localStorage.
-- Statistics page with daily and weekly charts, per-mode and per-weapon tables, and expandable past reports.
+**Weapons and maps**
 
-**Settings and UI**
-- Sensitivity page: DPI, eDPI, cm/360°, conversion from other games, and a live turn test.
-- Crosshair editor: colours plus custom hex, outlines, centre dot, inner and outer lines, error multipliers, static or dynamic. Includes a live and 4× preview, presets, and import/export codes plus a JSON download.
-- Graphics presets (Low, Medium, High). Each one sets shadows, resolution scale, FXAA and the level of effects.
-- Audio volumes, HUD toggles, and an FPS counter with performance metrics.
-- Minimap (top left, on by default): the map turns so your facing is up, with site letters and your view cone. Enemies within 30 m are always shown, even behind walls, as a training aid; ones you can actually see are drawn larger and brighter. Settings → HUD has the toggle and the range (0–60 m, 0 = never show enemies). A dashed ring marks the range.
-- Kill-streak sounds: kills 1–5 in a row each play their own rising chime (the 5th repeats; dying resets the streak). Footsteps for you and the bots use four takes with slight pitch variation.
+- Ghost, Spectre, Guardian and Operator (which would make the scoped-sensitivity setting useful), and a Classic skin.
 
-**Robustness**
-- The game pauses on Esc, pointer-lock loss, window blur or the tab being hidden.
-- Re-lock refusals are handled. Pointer lock is requested before fullscreen, because entering fullscreen uses up the click's user activation and the browser then refuses the lock. If the browser still refuses in a normal tab, the game stays paused and asks for another click; free-cursor aiming is only used inside embedded frames or when you choose it.
-- WebGL context loss is caught.
-- One Babylon engine is shared by all sessions and only one session can own it at a time. A session can be disposed while it is still loading, so React StrictMode's double mount in `npm run dev` no longer builds two engines on the same WebGL context, which used to double the loading time and corrupt rendering. Compiled shaders are kept (`Effect.PersistentMode`), so only the first session compiles them.
-- Bots never use a spot whose peek line passes within 6 m of the player's spawn. Spots are shared by all spawns of a side, so a spot generated for one spawn could otherwise sit next to another.
-- A clear message shows when WebGL is unavailable.
-- Audio starts on the first click.
-- Fullscreen with Keyboard Lock stops Ctrl+W from closing the tab while you crouch-walk.
+**Technology**
 
-### Partially done
+- Profile on real GPUs, test WebGPU, and tune the presets.
+- Load Babylon in smaller chunks for a faster first start; make the app an installable PWA that works offline.
+- Recast navmesh for smoother bot movement; and, much later, a 1v1 duel mode over WebRTC.
 
-- **WebGPU** is attempted only when you choose it in Settings, with an automatic fallback to WebGL 2. It hasn't been tested on GPU hardware.
-- **Navigation** is grid A*, not a Recast navmesh. It's reliable on this grid-built map, but it isn't Recast.
-- **The scoped sensitivity multiplier** is stored but has no effect yet, because there's no sniper rifle.
-- **Statistics** live in localStorage (capped at 300 sessions), not IndexedDB.
+## 6. Credits
 
-### Not built yet (roadmap)
-
-- **Map mechanics**: teleporters (Bind), ropes (Split), ziplines (Icebox) and rotating doors (Lotus). The layouts are built, but these mechanics aren't.
-- **Weapons**: Ghost, Spectre, Operator and Guardian.
-- **Practice modes**: Spray Control and Spray Transfer (with an impact wall and reference overlay), Counter-Strafe and Flick training. Wide-swing practice is available today through Angle Holding with the "Wide Swing" behaviour.
-- **Assets**: a Classic skin, more agent models, and real animation clips instead of code posing (bots and first-person arms are both posed in code).
-- **Sounds**: no recorded footsteps, reloads or kill-streak sounds are included. The slots exist (see `public/sounds/README.md`); add recordings you have the rights to.
-
-### Known issues and limits
-
-- Animated arms: the pack has no aim-down-sights, walking or pistol animations. Aiming moves the whole rig, and pistols are held by IK from the rifle idle pose, so pistol reloads only dip the gun and the hands don't animate. Rifle reload animations were authored for an M4, so on the Phantom and Sheriff skins (no separate magazine) the left hand mimes the magazine change. The Rigged and built-in arms are solved fresh each frame, not animated. The arm model's joint positions were measured on that one file, so a different arm model won't fit (the game checks the vertex count and falls back to the built-in arms). The forearm's skin texture is visibly stretched when the gun sits far forward. The Phantom and Sheriff skins have no separate magazine, so their reload only dips the gun.
-- The minimap doesn't show height: enemies on a raised floor or below you look the same.
-- Bots all use a Vandal.
-- Bots don't fight each other in Deathmatch.
-- Bots have no ragdoll; they fall over with a simple tilt. The agent model's cloth, hair and fingers don't move (those joints were merged to keep posing cheap).
-- The agent model isn't part of the single-file build, which always uses the training dummies. It adds about 1.4 MB and roughly 0.4 s to the first session's loading.
-- Real-GPU frame rate hasn't been measured; the automated runs use software rendering (SwiftShader, ~10 FPS). Expect to tune shadows and effects on low-end machines with the Low preset.
-- If the page is embedded in a sandboxed iframe, Pointer Lock may be blocked. The game then falls back to free-mouse aiming and shows a notice. Open it in its own tab for proper aiming.
-- Firefox doesn't support raw (unadjusted) pointer movement, so OS acceleration may apply.
+- "Sage | Valorant" and "Gaia Vandal (Orange)" and "Arcane Sheriff" by ILilMitch, "Phantom - Reaver (White Variant)" by MisterM4n, "M4 - FPS Weapon Animations Pack (v.1)" by BarcodeGames, "First-Person Arm & Hand - Fingerless Gloves" by Exactly, all CC BY 4.0. Links and the changes made are in `public/models/README.md`. The agent and skin designs belong to Riot Games and were made under Riot's fan-content policy, so keep the project free and non-commercial.
+- Gun recordings were supplied by the project owner (`public/sounds/`).
+- Everything else (maps, textures, simple guns, the training-dummy bots, synthesised sounds and the code) is original to this project.

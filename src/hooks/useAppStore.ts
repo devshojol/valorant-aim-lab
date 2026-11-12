@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { CrosshairPreset, GameSettings, PracticeConfig, SessionStats } from '../types';
-import { DEFAULT_PRACTICE, DEFAULT_SETTINGS } from '../settings/defaults';
+import { DEFAULT_PRACTICE, DEFAULT_SETTINGS, DIFFICULTY_PRESETS, GRAPHICS_PRESETS } from '../settings/defaults';
+import { detectDevice } from '../settings/deviceProfile';
 import { load, mergeDefaults, save } from '../services/storage';
 import { enterGameFullscreen } from '../utils/fullscreen';
 
@@ -29,11 +30,27 @@ function migrateSettings(s: GameSettings): GameSettings {
   return fpArms === s.graphics.fpArms ? s : { ...s, graphics: { ...s.graphics, fpArms } };
 }
 
+/** Settings on first run: the defaults with a graphics preset picked for this machine. */
+function firstRunSettings(): GameSettings {
+  if (typeof document === 'undefined') return DEFAULT_SETTINGS;
+  const { preset } = detectDevice();
+  const settings = { ...DEFAULT_SETTINGS, graphics: { ...DEFAULT_SETTINGS.graphics, ...GRAPHICS_PRESETS[preset], preset } };
+  save('settings', settings);
+  return settings;
+}
+
+/** A saved setup on a named difficulty always uses that difficulty's current values (presets gain fields over time). */
+function loadPractice(): PracticeConfig {
+  const p = mergeDefaults(DEFAULT_PRACTICE, load('practice', DEFAULT_PRACTICE));
+  return p.difficulty === 'custom' ? p : { ...p, tuning: DIFFICULTY_PRESETS[p.difficulty] ?? p.tuning };
+}
+
 function initialState(): AppState {
+  const stored = load<GameSettings | null>('settings', null);
   return {
     page: 'home',
-    settings: migrateSettings(mergeDefaults(DEFAULT_SETTINGS, load('settings', DEFAULT_SETTINGS))),
-    practice: mergeDefaults(DEFAULT_PRACTICE, load('practice', DEFAULT_PRACTICE)),
+    settings: stored ? migrateSettings(mergeDefaults(DEFAULT_SETTINGS, stored)) : firstRunSettings(),
+    practice: loadPractice(),
     sessions: load<SessionStats[]>('sessions', []),
     presets: load<CrosshairPreset[]>('crosshair-presets', []),
     playing: null,

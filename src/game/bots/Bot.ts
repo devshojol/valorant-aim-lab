@@ -242,7 +242,7 @@ export class Bot {
     this.aimErrYaw = gauss(ctx.rng) * sigma0;
     this.aimErrPitch = gauss(ctx.rng) * sigma0 * 0.6;
     this.errTau = lerp(0.5, 0.12, acc);
-    this.aimZone = ctx.rng() < 0.12 + 0.72 * acc ? 'head' : 'body';
+    this.aimZone = ctx.rng() < (this.tuning.headshotChance ?? 0.2) ? 'head' : 'body';
   }
 
   /** Called by the director when the bot is shot at or hears the player. */

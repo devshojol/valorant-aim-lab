@@ -58,6 +58,7 @@ export const MODE_LABELS: Record<PracticeConfig['mode'], string> = {
   'angle-hold': 'Angle Holding',
   jiggle: 'Jiggle Peek Training',
   deathmatch: 'Deathmatch',
+  spray: 'Spray Control',
 };
 
 export class PracticeDirector {
@@ -176,6 +177,7 @@ export class PracticeDirector {
   }
 
   start(ctx: BotContext) {
+    if (this.mode === 'spray') return; // a wall is the only target
     const n = Math.max(1, Math.min(this.d.config.botCount, this.mode === 'deathmatch' ? 10 : this.spots.length));
     for (let i = 0; i < n; i++) {
       const bot = this.makeBot();

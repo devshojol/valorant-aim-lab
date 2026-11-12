@@ -35,6 +35,8 @@ import { COL_BULLET, humanoidHitboxes, rayHumanoid, type HitZone } from '../phys
 import { PlayerController } from '../player/PlayerController';
 import { MODE_LABELS, PracticeDirector } from '../practice/PracticeDirector';
 import { avg, pct, SessionTracker } from '../practice/SessionTracker';
+import { SprayTrainer } from '../practice/SprayTrainer';
+import { drawSprayPanel } from '../hud/sprayPanel';
 import {
   Camera,
   Color3,
@@ -55,9 +57,9 @@ import {
 } from '../rendering/babylon';
 import { Effects } from '../rendering/Effects';
 import { renderMap, type MapRenderResult } from '../rendering/MapRenderer';
-import { muzzleFlashTexture, radialTexture } from '../rendering/textures';
+import { muzzleFlashTexture, radialTexture, setTextureQuality } from '../rendering/textures';
 import { ViewModel } from '../weapons/ViewModel';
-import { damageAt, WEAPONS } from '../weapons/weaponConfigs';
+import { damageAt, recoilAt, WEAPONS } from '../weapons/weaponConfigs';
 import { WeaponSystem, type ShotInfo } from '../weapons/WeaponSystem';
 import { enterGameFullscreen } from '../../utils/fullscreen';
 import { acquireRenderHost, releaseRenderHost, webglAvailable } from './RenderHost';
@@ -119,6 +121,9 @@ export class GameEngine {
   private armsTemplate: ArmsTemplate | null = null;
   private hitboxMeshes: Mesh[] | null = null;
   private minimap!: Minimap;
+  /** Spray-control mode only. */
+  private spray: SprayTrainer | null = null;
+  private sprayPattern: { id: WeaponId; points: [number, number][] } | null = null;
   /** Kills since the player's last death (drives the 1–5 kill sounds). */
   private killStreak = 0;
   private ctx!: BotContext;
@@ -148,6 +153,15 @@ export class GameEngine {
   /** A recorded reload is playing, and how far the reload had got (to tell a cancel from a finish). */
   private reloadClip = false;
   private lastReloadProgress = 0;
+  /** Adaptive resolution: extra render-scale factor (1 = the user's setting) and its controller state. */
+  private dynScale = 1;
+  private adaptT = 0;
+  private adaptFrames = 0;
+  private adaptHold = 0;
+  private adaptBackoff = 4;
+  private adaptLastUp = -1e9;
+  private slowTime = 0;
+  private slowWarned = false;
   private drawCallsTotal = 0;
   private drawCallsFrame = 0;
   private canvas!: HTMLCanvasElement;
@@ -212,6 +226,8 @@ export class GameEngine {
     mark('renderEngine');
     this.engine.disablePerformanceMonitorInBackground = true;
     this.applyResolution();
+    this.applyFpsCap();
+    setTextureQuality(this.settings.graphics.textureQuality);
 
     const scene = new Scene(this.engine);
     this.scene = scene;
@@ -222,12 +238,17 @@ export class GameEngine {
     scene.fogMode = Scene.FOGMODE_EXP2;
     scene.fogDensity = 0.0045;
     scene.fogColor = Color3.FromHexString(def.palette.fog);
-    scene.imageProcessingConfiguration.contrast = 1.18;
-    scene.imageProcessingConfiguration.exposure = 1.05;
-    scene.imageProcessingConfiguration.toneMappingEnabled = true;
-    scene.imageProcessingConfiguration.toneMappingType = 1; // ACES
-    scene.imageProcessingConfiguration.vignetteEnabled = true;
-    scene.imageProcessingConfiguration.vignetteWeight = 0.6;
+    if (this.settings.graphics.postFx) {
+      scene.imageProcessingConfiguration.contrast = 1.18;
+      scene.imageProcessingConfiguration.exposure = 1.05;
+      scene.imageProcessingConfiguration.toneMappingEnabled = true;
+      scene.imageProcessingConfiguration.toneMappingType = 1; // ACES
+      scene.imageProcessingConfiguration.vignetteEnabled = true;
+      scene.imageProcessingConfiguration.vignetteWeight = 0.6;
+    } else {
+      // low-end: skip the per-pixel grading maths in every material
+      scene.imageProcessingConfiguration.isEnabled = false;
+    }
     scene.setRenderingAutoClearDepthStencil(1, true, true, true);
 
     // camera
@@ -242,7 +263,8 @@ export class GameEngine {
     // lights (created before materials compile/freeze)
     // Bright, even stylised lighting: sky/ground hemisphere + warm sun (shadows) + cool fill.
     const hemi = new HemisphericLight('hemi', new Vector3(0.2, 1, -0.1), scene);
-    hemi.intensity = 0.85;
+    const simpleLight = this.settings.graphics.lighting === 'simple';
+    hemi.intensity = simpleLight ? 1.0 : 0.85;
     hemi.diffuse = Color3.FromHexString('#dfeaff');
     hemi.groundColor = Color3.FromHexString('#8f7d6a');
     hemi.specular = Color3.Black();
@@ -250,11 +272,13 @@ export class GameEngine {
     sun.position = new Vector3(60, 90, -50);
     sun.intensity = 1.25;
     sun.diffuse = Color3.FromHexString('#fff1d8');
-    const fill = new DirectionalLight('fill', new Vector3(0.5, -0.6, -0.6).normalize(), scene);
-    fill.intensity = 0.38;
-    fill.diffuse = Color3.FromHexString('#c9dcff');
-    fill.specular = Color3.Black();
-    fill.shadowEnabled = false;
+    if (!simpleLight) {
+      const fill = new DirectionalLight('fill', new Vector3(0.5, -0.6, -0.6).normalize(), scene);
+      fill.intensity = 0.38;
+      fill.diffuse = Color3.FromHexString('#c9dcff');
+      fill.specular = Color3.Black();
+      fill.shadowEnabled = false;
+    }
     const fx = this.settings.graphics.effects;
     if (fx !== 'low') {
       this.muzzleLight = new PointLight('muzzle-light', new Vector3(0, -100, 0), scene);
@@ -378,6 +402,7 @@ export class GameEngine {
     if (!this.armsTemplate && this.settings.graphics.fpArms !== 'simple') this.armsTemplate = new ArmsTemplate();
     this.viewModel = new ViewModel(scene, cam, [this.config.primary, this.config.secondary], skins, this.armsTemplate);
     this.tracker = new SessionTracker(this.config);
+    if (this.config.mode === 'spray') this.spray = new SprayTrainer();
     const location = findLocation(def, this.config.locationId);
     this.director = new PracticeDirector({
       map: this.map,
@@ -542,6 +567,8 @@ export class GameEngine {
       this.ended = true;
       this.input.enabled = false;
       this.input.exitLock();
+      const lastSpray = this.spray?.finish();
+      if (lastSpray) this.tracker.spray(lastSpray);
       const stats = this.tracker.finish(this.elapsed);
       this.setStatus('ended');
       this.emit({ type: 'ended', stats });
@@ -556,7 +583,11 @@ export class GameEngine {
     if (this.status === 'loading' || this.disposed) return; // init reads this.settings as it builds
     this.audio.applySettings(s.audio);
     this.input.rawRequested = s.sensitivity.rawInput;
-    if (prev.graphics.resolutionScale !== s.graphics.resolutionScale) this.applyResolution();
+    if (prev.graphics.resolutionScale !== s.graphics.resolutionScale || prev.graphics.adaptiveResolution !== s.graphics.adaptiveResolution) {
+      if (!s.graphics.adaptiveResolution) this.dynScale = 1;
+      this.applyResolution();
+    }
+    if (prev.graphics.fpsCap !== s.graphics.fpsCap) this.applyFpsCap();
     if (prev.graphics.antialias !== s.graphics.antialias) this.applyAntialias();
   }
 
@@ -593,9 +624,63 @@ export class GameEngine {
   /* ------------------------------------------------------------------ */
 
   private applyResolution() {
-    const dpr = Math.min(window.devicePixelRatio || 1, this.settings.graphics.preset === 'high' ? 2 : 1.5);
-    const scale = Math.max(0.4, Math.min(1, this.settings.graphics.resolutionScale)) * dpr;
+    const g = this.settings.graphics;
+    // Low-end tiers never render above one canvas pixel per CSS pixel.
+    const dprCap = g.preset === 'high' ? 2 : g.preset === 'potato' || g.textureQuality === 'low' ? 1 : 1.5;
+    const dpr = Math.min(window.devicePixelRatio || 1, dprCap);
+    const scale = Math.max(0.35, Math.max(0.4, Math.min(1, g.resolutionScale)) * this.dynScale * dpr);
     this.engine.setHardwareScalingLevel(1 / scale);
+  }
+
+  private applyFpsCap() {
+    const cap = this.settings.graphics.fpsCap;
+    this.engine.maxFPS = cap > 0 ? cap : undefined;
+  }
+
+  /**
+   * Adaptive resolution. Every half second of play, compare the measured frame rate with the target
+   * (60, or the FPS cap if lower): drop the render scale a step when it's short, and try a step back
+   * up after a quiet spell. If stepping up caused a drop, wait twice as long before trying again, so
+   * a machine that can't hold the higher scale doesn't flip back and forth.
+   */
+  private adaptResolution(rawDt: number) {
+    const g = this.settings.graphics;
+    this.adaptT += rawDt;
+    this.adaptFrames++;
+    if (this.adaptT < 0.5) return;
+    const fps = this.adaptFrames / this.adaptT;
+    const span = this.adaptT;
+    this.adaptT = 0;
+    this.adaptFrames = 0;
+    const target = g.fpsCap > 0 ? Math.min(60, g.fpsCap) : 60;
+
+    // Still slow at the floor: tell the player once that a lower preset would help.
+    const atFloor = !g.adaptiveResolution || this.dynScale <= 0.5;
+    this.slowTime = fps < Math.min(40, target * 0.7) && atFloor ? this.slowTime + span : 0;
+    if (this.slowTime > 6 && !this.slowWarned && g.preset !== 'potato') {
+      this.slowWarned = true;
+      this.emit({ type: 'notice', message: 'Low frame rate — try a lower graphics preset (Settings → Graphics → Potato or Low).' });
+    }
+
+    if (!g.adaptiveResolution) return;
+    const wall = performance.now() / 1000;
+    if (fps < target * 0.85) {
+      if (this.dynScale > 0.5) {
+        // a drop soon after stepping up means that step was too much: back off for longer
+        this.adaptBackoff = wall - this.adaptLastUp < 3 ? Math.min(60, this.adaptBackoff * 2) : this.adaptBackoff;
+        this.dynScale = Math.max(0.5, this.dynScale - (fps < target * 0.6 ? 0.2 : 0.1));
+        this.applyResolution();
+      }
+      this.adaptHold = 0;
+    } else if (this.dynScale < 1 && fps > target * 0.95) {
+      this.adaptHold += span;
+      if (this.adaptHold >= this.adaptBackoff) {
+        this.adaptHold = 0;
+        this.adaptLastUp = wall;
+        this.dynScale = Math.min(1, this.dynScale + 0.1);
+        this.applyResolution();
+      }
+    } else this.adaptHold = 0;
   }
 
   private applyAntialias() {
@@ -627,9 +712,10 @@ export class GameEngine {
     if (dt <= 0) dt = 1 / 240;
     this.frameMs = this.frameMs * 0.9 + dt * 1000 * 0.1;
     this.fps = 1000 / this.frameMs;
+    const running = this.status === 'running';
+    if (running) this.adaptResolution(dt);
     dt *= this.debugTimeScale; // tests can slow or freeze game time (rendering continues)
 
-    const running = this.status === 'running';
     let mdx = 0;
     let mdy = 0;
     if (running) {
@@ -672,6 +758,8 @@ export class GameEngine {
     this.weapons.update(dt, this.input, this.player);
     this.reloadSounds();
     this.director.update(this.ctx, dt, (x, y, z, yaw) => this.respawnPlayer(x, y, z, yaw));
+    const sprayDone = this.spray?.update(this.time);
+    if (sprayDone) this.tracker.spray(sprayDone);
     this.visTimer -= dt;
     if (this.visTimer <= 0) {
       this.visTimer = 1 / 30;
@@ -737,6 +825,10 @@ export class GameEngine {
   private resolvePlayerShot(shot: ShotInfo) {
     const { origin: o, dir: d, weapon } = shot;
     this.tracker.shot(shot);
+    if (this.spray) {
+      const done = this.spray.onShot(shot, this.time);
+      if (done) this.tracker.spray(done);
+    }
     this.audio.play(weapon.sound, { bus: 'weapons', volume: weapon.sound === 'rifle-suppressed' ? 0.65 : 0.8, rate: 0.97 + Math.random() * 0.06 });
     this.viewModel.onShot();
     if (this.muzzleLight && weapon.sound !== 'rifle-suppressed') {
@@ -835,7 +927,9 @@ export class GameEngine {
     const h = p.alive ? rayHumanoid(o[0], o[1], o[2], d[0], d[1], d[2], p.pos.x, p.pos.y, p.pos.z, p.yaw, p.crouch, maxT) : null;
     if (h) {
       end = [o[0] + d[0] * h.t, o[1] + d[1] * h.t, o[2] + d[2] * h.t];
-      const dmg = damageAt(bot.weapon, h.t)[h.zone];
+      // Headshot chance 0 means no headshot damage at all, so a stray bullet to the head counts as a body hit.
+      const zone = h.zone === 'head' && (bot.tuning.headshotChance ?? 0.2) <= 0 ? 'body' : h.zone;
+      const dmg = Math.round(damageAt(bot.weapon, h.t)[zone] * Math.max(0, bot.tuning.damageMult ?? 1));
       const before = p.health + p.armor;
       const killed = p.damage(dmg);
       this.tracker.damageTaken(Math.min(before, dmg));
@@ -847,7 +941,7 @@ export class GameEngine {
         this.deathFlash = 1;
         this.emit({
           type: 'killfeed',
-          entry: { id: this.killFeedId++, victim: 'You', weapon: `${bot.name} · ${bot.weapon.name}`, headshot: h.zone === 'head', byPlayer: false, time: Date.now() },
+          entry: { id: this.killFeedId++, victim: 'You', weapon: `${bot.name} · ${bot.weapon.name}`, headshot: zone === 'head', byPlayer: false, time: Date.now() },
         });
         this.director.onPlayerDeath(this.ctx);
       }
@@ -958,6 +1052,22 @@ export class GameEngine {
       );
     }
 
+    if (this.spray && this.status !== 'ended') {
+      const w = this.weapons.weapon;
+      if (this.sprayPattern?.id !== w.id) {
+        const points: [number, number][] = [];
+        for (let i = 0; i < w.magazine; i++) points.push(recoilAt(w, i));
+        this.sprayPattern = { id: w.id, points };
+      }
+      drawSprayPanel(ctx, dpr, W, H, {
+        weaponName: w.name,
+        pattern: this.sprayPattern.points,
+        live: this.spray.livePoints,
+        last: this.spray.last,
+        summary: this.tracker.stats.spray,
+      });
+    }
+
     if (this.settings.hud.showDamageIndicator) {
       for (let i = this.damageIndicators.length - 1; i >= 0; i--) {
         const di = this.damageIndicators[i];
@@ -1030,6 +1140,7 @@ export class GameEngine {
     state: () => ({
       status: this.status,
       renderer: this.rendererName,
+      renderScale: this.dynScale,
       time: this.time,
       elapsed: this.elapsed,
       fps: Math.round(this.fps),

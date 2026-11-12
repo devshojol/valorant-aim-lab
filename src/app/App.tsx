@@ -1,5 +1,5 @@
 import { ChartColumn, Crosshair, House, Map as MapIcon, MousePointer2, Settings, Swords, Target } from 'lucide-react';
-import type { ComponentType } from 'react';
+import { lazy, Suspense, useEffect, type ComponentType } from 'react';
 import { store, useAppStore, type Page } from '../hooks/useAppStore';
 import { cx } from '../components/ui';
 import { HomePage } from '../pages/HomePage';
@@ -10,7 +10,11 @@ import { CrosshairPage } from '../pages/CrosshairPage';
 import { SensitivityPage } from '../pages/SensitivityPage';
 import { StatisticsPage } from '../pages/StatisticsPage';
 import { SettingsPage } from '../pages/SettingsPage';
-import { GamePage } from '../pages/GamePage';
+
+// The game page pulls in the whole 3D engine (~3 MB), so it loads on demand: the menus show
+// without it, and it is fetched in the background once the browser is idle.
+const loadGamePage = () => import('../pages/GamePage').then((m) => ({ default: m.GamePage }));
+const GamePage = lazy(loadGamePage);
 
 const NAV: { id: Page; label: string; icon: ComponentType<{ size?: number; className?: string }> }[] = [
   { id: 'home', label: 'Home', icon: House },
@@ -41,7 +45,17 @@ export function App() {
   const page = useAppStore((s) => s.page);
   const playing = useAppStore((s) => s.playing);
 
-  if (playing) return <GamePage config={playing} />;
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((fn: () => void) => window.setTimeout(fn, 1500));
+    idle(() => void loadGamePage().catch(() => {}));
+  }, []);
+
+  if (playing)
+    return (
+      <Suspense fallback={<div className="grid h-full place-items-center bg-black font-display text-sm uppercase tracking-widest text-mute">Loading game engine…</div>}>
+        <GamePage config={playing} />
+      </Suspense>
+    );
 
   return (
     <div className="flex h-full flex-col md:flex-row">

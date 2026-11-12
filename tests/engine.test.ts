@@ -165,3 +165,58 @@ describe('crosshair codes', () => {
     expect(importCrosshairCode('garbage')).toBeNull();
   });
 });
+
+describe('spray trainer', () => {
+  // Fire a full Vandal magazine; `control` (0..1) is how much of the recoil the aim cancels.
+  async function spray(control: number) {
+    const { SprayTrainer } = await import('../src/game/practice/SprayTrainer');
+    const w = world();
+    const player = new PlayerController(w);
+    player.spawn(0, 0, 0, 90);
+    const ws = new WeaponSystem('vandal', 'classic');
+    ws.equipTimer = 0;
+    ws.rng = () => 0.5; // no jitter; spread radius is constant
+    const trainer = new SprayTrainer();
+    const results: import('../src/types').SprayResult[] = [];
+    let time = 0;
+    const yaw0 = player.yaw;
+    const pitch0 = player.pitch;
+    ws.events.onShot = (s) => {
+      const r = trainer.onShot(s, time);
+      if (r) results.push(r);
+    };
+    const input = new FakeInput();
+    input.held.add('fire');
+    const DEG = Math.PI / 180;
+    for (let i = 0; i < 400 && ws.slot.ammo > 0; i++) {
+      const [ry, rp] = recoilAt(WEAPONS.vandal, ws.recoilIndex);
+      player.yaw = yaw0 - ry * DEG * control;
+      player.pitch = pitch0 - rp * DEG * control;
+      ws.update(1 / 120, input as unknown as Input, player);
+      time += 1 / 120;
+    }
+    const r = trainer.update(time + 1);
+    if (r) results.push(r);
+    return results;
+  }
+
+  it('scores an uncontrolled spray near 0 and a fully controlled one near 100', async () => {
+    const none = await spray(0);
+    const full = await spray(1);
+    expect(none).toHaveLength(1);
+    expect(none[0].bullets).toBe(25);
+    expect(none[0].score).toBeLessThanOrEqual(2);
+    expect(full[0].score).toBeGreaterThanOrEqual(98);
+    expect(full[0].tightPct).toBe(100);
+    const half = await spray(0.5);
+    expect(half[0].score).toBeGreaterThan(40);
+    expect(half[0].score).toBeLessThan(60);
+  });
+
+  it('ignores taps shorter than five bullets', async () => {
+    const { scoreSpray } = await import('../src/game/practice/SprayTrainer');
+    const pt = { bullet: [0, 0] as [number, number], control: [0, 0] as [number, number], recoil: [0, 1] as [number, number] };
+    expect(scoreSpray(WEAPONS.vandal, [pt, pt, pt, pt])).toBeNull();
+    expect(scoreSpray(WEAPONS.vandal, [pt, pt, pt, pt, pt])?.score).toBe(100);
+  });
+});

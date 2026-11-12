@@ -14,6 +14,11 @@ export interface ShotInfo {
   firstShot: boolean;
   moving: boolean;
   spreadDeg: number;
+  /** The player's aim (radians) when the bullet left, before recoil and spread. */
+  aimYaw: number;
+  aimPitch: number;
+  /** Recoil-pattern offset [yaw, pitch] in degrees applied to this bullet (no jitter or spread). */
+  recoil: [number, number];
 }
 
 export interface WeaponEvents {
@@ -257,6 +262,7 @@ export class WeaponSystem {
     const firstShot = this.recoilIndex < 0.5;
     const adsK = this.isAds ? w.recoil.adsMult : 1;
     let [ry, rp] = recoilAt(w, this.recoilIndex);
+    const recoil: [number, number] = [ry * adsK, rp * adsK];
     ry = ry * adsK + (this.rng() - 0.5) * 2 * w.recoil.jitter * (firstShot ? 0 : 1);
     rp = rp * adsK + (this.rng() - 0.5) * 2 * w.recoil.jitter * (firstShot ? 0 : 1);
     const sp = this.spread(player);
@@ -276,6 +282,9 @@ export class WeaponSystem {
       firstShot,
       moving: speedFrac > w.spread.accurateSpeedFraction || !player.grounded,
       spreadDeg,
+      aimYaw: player.yaw,
+      aimPitch: player.pitch,
+      recoil,
     };
     this.recoilIndex += 1;
     this.firingError = Math.min(w.spread.firingMax, this.firingError + w.spread.firingPerShot);

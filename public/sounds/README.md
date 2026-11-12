@@ -33,7 +33,8 @@ Example:
 ## Notes
 
 - The current Vandal, Phantom and Sheriff takes were cut from recordings supplied by the project owner
-  with `scripts/extract-gun-samples.py`. The Classic has no recording, so it keeps the synthesised shot.
+  with `scripts/extract-gun-samples.py`. The owner also added `footstep.mp3`, `reload.wav` and `kill-1.mp3` …
+  `kill-5.mp3`. The Classic, jump, landing and headshot slots have no recording, so they stay synthesised.
 - WAV, MP3 or OGG all work. When a slot lists several files, one is picked at random each time (footsteps and shots
   also get a small pitch variation), so repeats don't sound looped.
 - Silence at the start and end of every file is trimmed when it loads, so sounds play on time. The engine adds

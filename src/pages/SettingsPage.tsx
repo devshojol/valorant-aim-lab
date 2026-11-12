@@ -1,10 +1,11 @@
 import { Download, RotateCcw, Upload } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { AudioSettings, GraphicsPreset, GraphicsSettings, HudSettings } from '../types';
 import { store, useAppStore } from '../hooks/useAppStore';
 import { Button, Card, ConfirmButton, Field, PageHeader, Segmented, Slider, Toggle } from '../components/ui';
 import { DEFAULT_SETTINGS, GRAPHICS_PRESETS } from '../settings/defaults';
 import { mergeDefaults } from '../services/storage';
+import { detectDevice } from '../settings/deviceProfile';
 
 const KEYS: [string, string][] = [
   ['W A S D', 'Move'],
@@ -26,6 +27,7 @@ export function SettingsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [exported, setExported] = useState<string | null>(null);
+  const device = useMemo(detectDevice, []);
   const setG = (p: Partial<GraphicsSettings>) => store.updateSettings((s) => ({ ...s, graphics: { ...s.graphics, ...p, preset: p.preset ?? 'custom' } }));
   const setA = (p: Partial<AudioSettings>) => store.updateSettings((s) => ({ ...s, audio: { ...s.audio, ...p } }));
   const setH = (p: Partial<HudSettings>) => store.updateSettings((s) => ({ ...s, hud: { ...s.hud, ...p } }));
@@ -44,12 +46,21 @@ export function SettingsPage() {
               value={g.preset}
               onChange={preset}
               options={[
+                { value: 'potato', label: 'Potato' },
                 { value: 'low', label: 'Low' },
                 { value: 'medium', label: 'Medium' },
                 { value: 'high', label: 'High' },
                 { value: 'custom', label: 'Custom' },
               ]}
             />
+            <p className="mt-2 text-xs text-dim">
+              Potato is for machines without a dedicated GPU: simple models, no shadows or post-processing, 60% resolution. Detected here:{' '}
+              <span className="text-mute">{device.gpu || 'unknown GPU'}</span> ({device.reason}) — suggested preset{' '}
+              <button className="text-accent underline" onClick={() => preset(device.preset)}>
+                {device.preset[0].toUpperCase() + device.preset.slice(1)}
+              </button>
+              . Model, shadow, lighting and texture changes apply on the next session.
+            </p>
           </Field>
           <Field label="Shadows">
             <Segmented
@@ -74,7 +85,47 @@ export function SettingsPage() {
             />
           </Field>
           <Slider label="Resolution scale" value={g.resolutionScale} min={0.5} max={1} step={0.05} onChange={(v) => setG({ resolutionScale: v })} format={(v) => `${Math.round(v * 100)}% of native`} />
+          <Toggle
+            label="Adaptive resolution"
+            hint="Lowers the resolution automatically while the frame rate is under 60 (or your FPS limit) and restores it afterwards."
+            checked={g.adaptiveResolution}
+            onChange={(v) => setG({ adaptiveResolution: v, preset: g.preset })}
+          />
+          <Field label="FPS limit">
+            <Segmented
+              value={g.fpsCap}
+              onChange={(v) => setG({ fpsCap: v, preset: g.preset })}
+              options={[
+                { value: 0, label: 'Unlimited' },
+                { value: 30, label: '30' },
+                { value: 60, label: '60' },
+                { value: 120, label: '120' },
+                { value: 144, label: '144' },
+              ]}
+            />
+          </Field>
           <Toggle label="Anti-aliasing (FXAA)" checked={g.antialias} onChange={(v) => setG({ antialias: v })} />
+          <Toggle label="Post-processing (tone mapping, contrast, vignette)" checked={g.postFx} onChange={(v) => setG({ postFx: v })} />
+          <Field label="Lighting">
+            <Segmented
+              value={g.lighting}
+              onChange={(v) => setG({ lighting: v })}
+              options={[
+                { value: 'simple', label: 'Simple' },
+                { value: 'full', label: 'Full' },
+              ]}
+            />
+          </Field>
+          <Field label="Textures">
+            <Segmented
+              value={g.textureQuality}
+              onChange={(v) => setG({ textureQuality: v })}
+              options={[
+                { value: 'low', label: 'Low' },
+                { value: 'high', label: 'High' },
+              ]}
+            />
+          </Field>
           <Toggle
             label="Fullscreen on start"
             hint="Uses Keyboard Lock so Ctrl (crouch) + W can't close the tab. When off, crouch with C instead of Ctrl."
@@ -85,7 +136,7 @@ export function SettingsPage() {
             <Field label="Gun models">
               <Segmented
                 value={g.gunModels}
-                onChange={(v) => setG({ gunModels: v, preset: g.preset })}
+                onChange={(v) => setG({ gunModels: v })}
                 options={[
                   { value: 'skins', label: 'Skins' },
                   { value: 'simple', label: 'Simple' },
@@ -100,7 +151,7 @@ export function SettingsPage() {
           <Field label="First-person arms">
             <Segmented
               value={!__LOCAL_MODELS__ && g.fpArms === 'animated' ? 'rigged' : g.fpArms}
-              onChange={(v) => setG({ fpArms: v, preset: g.preset })}
+              onChange={(v) => setG({ fpArms: v })}
               options={[
                 ...(__LOCAL_MODELS__ ? [{ value: 'animated' as const, label: 'Animated' }] : []),
                 { value: 'rigged', label: 'Rigged arms' },
@@ -118,7 +169,7 @@ export function SettingsPage() {
             <Field label="Bot model">
               <Segmented
                 value={g.botModel}
-                onChange={(v) => setG({ botModel: v, preset: g.preset })}
+                onChange={(v) => setG({ botModel: v })}
                 options={[
                   { value: 'agent', label: 'Sage (rigged)' },
                   { value: 'dummy', label: 'Training dummy' },
