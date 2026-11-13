@@ -67,9 +67,13 @@ export class PlayerController {
   }
 
   /** Raw mouse counts → camera rotation using Valorant-scale sensitivity (0.07°/count). */
-  applyLook(dx: number, dy: number, s: SensitivitySettings, zoomed: boolean) {
+  /**
+   * `zoom`: a scope's magnification. Scoped look speed is divided by it, so at a scoped multiplier of 1
+   * the picture moves across the screen as fast as it does unscoped, at either zoom level.
+   */
+  applyLook(dx: number, dy: number, s: SensitivitySettings, zoomed: boolean, scoped = false, zoom = 1) {
     if (dx === 0 && dy === 0) return;
-    const mult = zoomed ? s.adsMult : 1;
+    const mult = zoomed ? (scoped ? s.scopedMult / zoom : s.adsMult) : 1;
     const k = ((s.sensitivity * YAW_DEG_PER_COUNT * Math.PI) / 180) * mult;
     this.yaw += dx * k * s.horizontalMult;
     this.pitch -= dy * k * s.verticalMult * (s.invertY ? -1 : 1);

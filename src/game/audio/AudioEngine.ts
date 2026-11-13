@@ -13,6 +13,10 @@ const SAMPLE_KEYS: Record<GunSoundId, string> = {
   'rifle-suppressed': 'phantom',
   'pistol-light': 'classic',
   'pistol-heavy': 'sheriff',
+  'rifle-dmr': 'guardian',
+  'smg-suppressed': 'spectre',
+  sniper: 'operator',
+  'pistol-suppressed': 'ghost',
 };
 
 /**
@@ -29,7 +33,7 @@ const EXTRA_KEYS: Record<string, string> = {
   headshot: 'headshot',
   ...Object.fromEntries([1, 2, 3, 4, 5].map((n) => [`kill${n}`, `kill${n}`])),
   ...Object.fromEntries(
-    ['vandal', 'phantom', 'sheriff', 'classic'].flatMap((w) => [
+    ['vandal', 'phantom', 'spectre', 'guardian', 'operator', 'sheriff', 'ghost', 'classic'].flatMap((w) => [
       [`reload-${w}`, `reload-${w}`],
       ...[1, 2, 3, 4, 5].map((n) => [`${w}-kill${n}`, `${w}-kill${n}`]),
     ]),
@@ -251,6 +255,15 @@ export class AudioEngine {
         if (!decoded.length) return;
         this.recorded.add(id);
         this.buffers.set(id, decoded);
+        if (id.startsWith('reload')) {
+          // cut at the pause between taking the magazine out and putting the new one in (see playReload)
+          const parts = splitReload(ctx, decoded[0]);
+          if (parts) {
+            this.buffers.set(`${id}#out`, [parts.out]);
+            this.buffers.set(`${id}#in`, [parts.in]);
+            this.reloadParts.set(id, { outPeak: parts.outPeak, inPeak: parts.inPeak });
+          }
+        }
         this.sampleOverrides.push(key);
       }),
     );
@@ -259,6 +272,32 @@ export class AudioEngine {
   /** True when a sound with this name is loaded (synthesized or recorded). */
   has(name: string): boolean {
     return (this.buffers.get(name)?.length ?? 0) > 0;
+  }
+
+  /** Reload recordings that were cut in two: seconds from each part's start to its loudest moment. */
+  private readonly reloadParts = new Map<string, { outPeak: number; inPeak: number }>();
+
+  /**
+   * Play a reload recording in time with the reload animation: its first half so that its loudest
+   * moment falls `outAt` seconds from now (the magazine coming out), its second half so that its
+   * loudest moment falls at `inAt` (the new magazine going in). A recording with no clear pause in it
+   * is played whole, straight away. Both halves stop with `stopReload`.
+   */
+  playReload(name: string, outAt: number, inAt: number, volume = 0.8) {
+    const parts = this.reloadParts.get(name);
+    if (!parts) {
+      this.play(name, { volume, group: 'reload' });
+      return;
+    }
+    const outStart = Math.max(0, outAt - parts.outPeak);
+    this.play(`${name}#out`, { volume, group: 'reload', delay: outStart });
+    this.play(`${name}#in`, { volume, group: 'reload-in', delay: Math.max(outStart, inAt - parts.inPeak) });
+  }
+
+  /** Cut off a reload recording (the reload was cancelled). */
+  stopReload() {
+    this.stopGroup('reload');
+    this.stopGroup('reload-in');
   }
 
   /** True when this sound comes from a recording in public/sounds. */
@@ -575,6 +614,46 @@ export function trimSilence(ctx: BaseAudioContext, b: AudioBuffer): AudioBuffer 
   const to = Math.min(b.length, last + Math.floor(0.03 * b.sampleRate));
   if (from === 0 && to === b.length) return b;
   return fadeOut(ctx, slice(ctx, b, from, to), Infinity, 0.01);
+}
+
+/**
+ * Cut a reload recording in two at the quietest moment between its two loudest sounds (magazine out,
+ * magazine in), so each half can be played when the animation gets there. Returns each half and the
+ * time from its start to its loudest moment, or null when the take has no second sound at least a
+ * quarter as loud as the first and 0.15 s away from it.
+ */
+export function splitReload(ctx: BaseAudioContext, b: AudioBuffer): { out: AudioBuffer; in: AudioBuffer; outPeak: number; inPeak: number } | null {
+  const frame = Math.max(1, Math.floor(0.01 * b.sampleRate));
+  const frames = Math.floor(b.length / frame);
+  if (frames < 30) return null;
+  const env = new Float32Array(frames);
+  for (let f = 0; f < frames; f++) {
+    let sum = 0;
+    for (let c = 0; c < b.numberOfChannels; c++) {
+      const d = b.getChannelData(c);
+      for (let i = f * frame; i < (f + 1) * frame; i++) sum += d[i] * d[i];
+    }
+    env[f] = Math.sqrt(sum / (frame * b.numberOfChannels));
+  }
+  const loudest = (from: number, to: number, skip = -1, gap = 0) => {
+    let at = -1;
+    for (let f = from; f < to; f++) if ((skip < 0 || Math.abs(f - skip) >= gap) && (at < 0 || env[f] > env[at])) at = f;
+    return at;
+  };
+  const first = loudest(0, frames);
+  const second = loudest(0, frames, first, 15);
+  if (first < 0 || second < 0 || env[second] < env[first] * 0.25) return null;
+  const a = Math.min(first, second);
+  const z = Math.max(first, second);
+  let cut = a + 1;
+  for (let f = a + 1; f < z; f++) if (env[f] < env[cut]) cut = f;
+  const at = cut * frame;
+  return {
+    out: fadeOut(ctx, slice(ctx, b, 0, at), Infinity, 0.01),
+    in: slice(ctx, b, at, b.length),
+    outPeak: (a * frame) / b.sampleRate,
+    inPeak: ((z - cut) * frame) / b.sampleRate,
+  };
 }
 
 /**

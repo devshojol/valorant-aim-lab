@@ -52,7 +52,16 @@ export function App() {
 
   if (playing)
     return (
-      <Suspense fallback={<div className="grid h-full place-items-center bg-black font-display text-sm uppercase tracking-widest text-mute">Loading game engine…</div>}>
+      <Suspense
+        fallback={
+          <div className="grid h-full place-items-center bg-bg">
+            <div className="w-72 text-center">
+              <div className="font-display text-xl uppercase tracking-widest text-mute">Loading game engine</div>
+              <div className="tal-loadbar mt-4" />
+            </div>
+          </div>
+        }
+      >
         <GamePage config={playing} />
       </Suspense>
     );
@@ -71,7 +80,7 @@ export function App() {
                 onClick={() => store.go(n.id)}
                 className={cx(
                   'group relative flex items-center gap-2 px-2.5 py-2 text-left font-display text-sm font-semibold uppercase tracking-wider transition-colors md:w-full md:gap-3 md:px-3 md:py-2.5 md:text-[15px]',
-                  active ? 'bg-white/[0.06] text-ink' : 'text-mute hover:bg-white/[0.03] hover:text-ink',
+                  active ? 'bg-gradient-to-r from-accent/15 to-transparent text-ink' : 'text-mute hover:bg-white/[0.03] hover:text-ink',
                 )}
               >
                 <span className={cx('absolute left-0 top-1.5 bottom-1.5 w-[3px]', active ? 'bg-accent' : 'bg-transparent')} />

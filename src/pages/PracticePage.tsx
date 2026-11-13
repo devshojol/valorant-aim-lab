@@ -1,6 +1,6 @@
 import { Lock, Play, SlidersHorizontal } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { BotBehavior, BotTuning, Difficulty, PracticeConfig, PracticeMode, Side, WeaponId } from '../types';
+import type { BotBehavior, BotTuning, BotWeapons, Difficulty, PracticeConfig, PracticeMode, Side, WeaponId } from '../types';
 import { store, useAppStore } from '../hooks/useAppStore';
 import { Badge, Button, Card, Field, PageHeader, Segmented, Slider, Toggle, cx } from '../components/ui';
 import { MapPreview, mapDataFor } from '../components/MapPreview';
@@ -161,7 +161,8 @@ export function PracticePage() {
                 <button
                   key={m}
                   onClick={() => update({ mode: m, botCount: m === 'deathmatch' ? Math.max(cfg.botCount, 4) : Math.min(cfg.botCount, 3) })}
-                  className={cx('border p-4 text-left transition-colors', m === cfg.mode ? 'border-accent bg-accent/10' : 'border-line bg-bg/50 hover:border-mute')}
+                  data-active={m === cfg.mode}
+                  className={cx('tal-tile border p-4 text-left', m === cfg.mode ? 'border-accent bg-accent/10' : 'border-line bg-bg/50 hover:border-mute')}
                 >
                   <div className="font-display text-lg font-bold uppercase">{MODE_INFO[m].label}</div>
                   <div className="mt-1 text-xs leading-relaxed text-mute">{MODE_INFO[m].desc}</div>
@@ -229,9 +230,33 @@ export function PracticePage() {
                 format={(v) => `${Math.round(v * 100)}%`}
               />
             </div>
+            <div className="grid gap-x-6 md:grid-cols-2">
+              <Field label="Bot weapons">
+                <Segmented
+                  value={cfg.botWeapons}
+                  onChange={(v: BotWeapons) => update({ botWeapons: v })}
+                  options={[
+                    { value: 'mixed', label: 'Mixed', title: 'Rifles, SMG, marksman rifle and sidearms (no sniper)' },
+                    { value: 'rifles', label: 'Rifles', title: 'Vandal and Phantom only' },
+                    { value: 'pistols', label: 'Sidearms', title: 'Classic, Ghost and Sheriff' },
+                    { value: 'mirror', label: 'Same as mine', title: 'Your primary weapon' },
+                  ]}
+                />
+              </Field>
+              <Slider
+                label="Bots firing at once"
+                value={cfg.tuning.maxAttackers}
+                min={0}
+                max={5}
+                step={1}
+                onChange={(v) => tune({ maxAttackers: Math.round(v) })}
+                format={(v) => (v <= 0 ? 'No limit' : `${v}`)}
+              />
+            </div>
             <p className="mb-3 text-xs text-dim">
               Headshot chance is how often a bot aims for your head when it spots you (a Vandal headshot kills in one bullet); at "Never" bots deal no headshot
-              damage. Bot damage scales every hit you take. Changing either switches the difficulty to Custom.
+              damage. Bot damage scales every hit you take. "Bots firing at once" makes the others hold fire until a slot frees up. Changing a slider switches the
+              difficulty to Custom.
             </p>
             {cfg.mode === 'angle-hold' && (
               <Field label="Bot behaviour">

@@ -220,3 +220,107 @@ describe('spray trainer', () => {
     expect(scoreSpray(WEAPONS.vandal, [pt, pt, pt, pt, pt])?.score).toBe(100);
   });
 });
+
+describe('weapon roster', () => {
+  it('every weapon has a usable config', async () => {
+    const { ALL_WEAPONS, PRIMARY_WEAPONS, SECONDARY_WEAPONS } = await import('../src/game/weapons/weaponConfigs');
+    expect(ALL_WEAPONS).toHaveLength(8);
+    for (const id of ALL_WEAPONS) {
+      const w = WEAPONS[id];
+      expect(w.id).toBe(id);
+      expect(w.recoil.loopFrom).toBeLessThan(w.recoil.pattern.length);
+      expect(w.damage[w.damage.length - 1].maxRange).toBeGreaterThan(100);
+      expect((w.slot === 'primary' ? PRIMARY_WEAPONS : SECONDARY_WEAPONS).includes(id)).toBe(true);
+      // looping past the pattern never produces NaN
+      expect(recoilAt(w, w.magazine + 7.5).every(Number.isFinite)).toBe(true);
+    }
+  });
+
+  it('the Operator is only accurate when scoped and kills with a body shot', () => {
+    const w = world();
+    const player = new PlayerController(w);
+    player.spawn(0, 0, 0, 90);
+    const ws = new WeaponSystem('operator', 'classic');
+    ws.equipTimer = 0;
+    expect(ws.spread(player).total).toBeGreaterThan(3);
+    ws.ads = 1;
+    expect(ws.spread(player).total).toBe(0);
+    expect(damageAt(WEAPONS.operator, 40).body).toBeGreaterThanOrEqual(150);
+  });
+
+  it('the Operator scope cycles 2.5× → 5× → off, drops while the bolt is worked and comes back by itself', () => {
+    const w = world();
+    const player = new PlayerController(w);
+    player.spawn(0, 0, 0, 90);
+    const ws = new WeaponSystem('operator', 'classic');
+    ws.equipTimer = 0;
+    const input = new FakeInput();
+    const run = (sec: number) => {
+      for (let t = 0; t < sec; t += 1 / 120) ws.update(1 / 120, input as unknown as Input, player);
+    };
+    const click = (a: Action) => {
+      input.pressed.add(a);
+      run(1 / 120);
+    };
+    click('alt');
+    run(0.5);
+    expect(ws.scopeLevel).toBe(1);
+    expect(ws.zoom).toBeCloseTo(2.5, 2);
+    click('alt');
+    run(0.5);
+    expect(ws.zoom).toBeCloseTo(5, 1);
+    click('alt');
+    run(0.5);
+    expect(ws.scopeLevel).toBe(0);
+    expect(ws.zoom).toBeCloseTo(1, 2);
+
+    // scoped shot: the scope drops for the bolt and is back up, at the same zoom, when the next shot is ready
+    click('alt');
+    click('alt');
+    run(0.6);
+    let shots = 0;
+    ws.events.onShot = () => shots++;
+    click('fire');
+    expect(shots).toBe(1);
+    run(0.6);
+    expect(ws.ads).toBe(0);
+    expect(ws.boltCycleAge).toBeGreaterThan(0.5);
+    click('fire'); // the bolt is still being worked
+    expect(shots).toBe(1);
+    run(1 / 0.6 - 0.6);
+    expect(ws.ads).toBe(1);
+    expect(ws.zoom).toBeCloseTo(5, 1);
+    expect(ws.spread(player).total).toBe(0);
+    click('fire');
+    expect(shots).toBe(2);
+
+    // reloading leaves the scope for good
+    ws.startReload();
+    run(WEAPONS.operator.reloadTime + 0.5);
+    expect(ws.scopeLevel).toBe(0);
+    expect(ws.ads).toBe(0);
+  });
+});
+
+describe('weapon menu swap', () => {
+  it('replaces the weapon in a slot with a full magazine and re-draws it when in hand', () => {
+    const ws = new WeaponSystem('vandal', 'classic');
+    ws.equipTimer = 0;
+    ws.slot.ammo = 3;
+    ws.recoilIndex = 9;
+    let equipped = '';
+    ws.events.onEquip = (w) => (equipped = w.id);
+    ws.setSlot(0, 'spectre');
+    expect(ws.weapon.id).toBe('spectre');
+    expect(ws.slot.ammo).toBe(WEAPONS.spectre.magazine);
+    expect(ws.recoilIndex).toBe(0);
+    expect(ws.equipTimer).toBeGreaterThan(0);
+    expect(equipped).toBe('spectre');
+    // the other slot changes quietly
+    equipped = '';
+    ws.setSlot(1, 'ghost');
+    expect(ws.weapon.id).toBe('spectre');
+    expect(ws.slots[1].cfg.id).toBe('ghost');
+    expect(equipped).toBe('');
+  });
+});

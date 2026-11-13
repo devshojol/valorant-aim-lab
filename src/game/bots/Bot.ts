@@ -23,6 +23,10 @@ export interface BotContext {
   rng: () => number;
   /** Engine resolves the shot against walls and the player. */
   botFire(bot: Bot, origin: Vec3, dir: Vec3): void;
+  /** Whether this bot may shoot right now (limits how many bots fire at once). Claims a slot when true. */
+  mayFire(bot: Bot): boolean;
+  /** Bots hold fire until this game time (spawn protection for the player). */
+  graceUntil: number;
   onBotFootstep(bot: Bot): void;
 }
 
@@ -313,7 +317,9 @@ export class Bot {
       this.seesPlayer &&
       ctx.player.alive &&
       ctx.time >= this.reactAt &&
-      this.burstPause <= 0;
+      ctx.time >= ctx.graceUntil &&
+      this.burstPause <= 0 &&
+      ctx.mayFire(this);
     if (!canShoot) {
       this.fireCooldown = Math.max(0, this.fireCooldown);
       return;
@@ -328,10 +334,12 @@ export class Bot {
 
     if (this.burstLeft <= 0) {
       const base = Math.max(1, Math.round(this.tuning.burstLength));
-      this.burstLeft = this.sprayMode ? base + 6 + Math.floor(ctx.rng() * 6) : base + Math.floor(ctx.rng() * 2);
+      // semi-automatic guns are tapped: one or two shots, then a pause
+      if (!w.auto) this.burstLeft = w.fireRate < 1.5 ? 1 : 1 + Math.floor(ctx.rng() * 2);
+      else this.burstLeft = this.sprayMode ? base + 6 + Math.floor(ctx.rng() * 6) : base + Math.floor(ctx.rng() * 2);
     }
     this.fireOnce(ctx, speedFrac);
-    this.fireCooldown = Math.max(this.fireCooldown, -0.05) + 1 / w.fireRate;
+    this.fireCooldown = Math.max(this.fireCooldown, -0.05) + (w.auto ? 1 : 1.3) / w.fireRate;
     this.burstLeft--;
     if (this.burstLeft <= 0) this.burstPause = lerp(0.5, 0.22, this.acc) * (0.8 + ctx.rng() * 0.5);
   }

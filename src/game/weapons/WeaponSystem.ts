@@ -5,6 +5,18 @@ import { RUN_SPEED } from '../player/PlayerController';
 import { WEAPONS, recoilAt } from './weaponConfigs';
 
 const DEG = Math.PI / 180;
+/** Share of the reload time the reload animation takes (1 = the animation ends exactly when the gun can fire). */
+export const RELOAD_ANIM_SHARE = 1;
+/** Bolt action: the scope starts coming back up this long before the next shot is ready (seconds). */
+export const RESCOPE_LEAD = 0.5;
+/**
+ * Working the bolt after a shot, in seconds after it (for a gun firing every 1.67 s; scaled to others):
+ * the trigger hand goes to the handle (`reach`), lifts it (`lift`), draws the bolt back (`back`), pushes it
+ * home (`forward`), turns the handle down (`down`) and is back on the grip at `done`.
+ */
+export const BOLT_CYCLE = { reach: 0.26, lift: 0.46, back: 0.56, forward: 0.74, down: 0.9, release: 0.98, done: 1.15, per: 1 / 0.6 };
+/** Bolt action: the wait between the last round of a magazine and its reload (no bolt to work). */
+const LAST_ROUND_DELAY = 0.45;
 
 export interface ShotInfo {
   origin: [number, number, number];
@@ -51,6 +63,10 @@ export class WeaponSystem {
   sinceShot = 10;
   ads = 0; // 0..1 blend
   adsHeld = false;
+  /** Scoped weapons: 0 = not scoped, 1 and 2 = the zoom levels (right click cycles through them). */
+  scopeLevel = 0;
+  /** Scoped weapons: the zoom the scope is at now (eased between the two levels). */
+  scopeZoom = 1;
   burstQueue = 0;
   burstTimer = 0;
   burstCooldown = 0;
@@ -83,20 +99,31 @@ export class WeaponSystem {
     return this.reloadTimer > 0 ? 1 - this.reloadTimer / this.weapon.reloadTime : 0;
   }
   /**
-   * Progress of the reload *animation* (0 → 1). The animation (and its sound cues) runs faster than
-   * the reload itself — over 55% of the reload time, at most 1.3 s — then the gun waits, ready,
-   * until the reload completes. 1 when not reloading.
+   * Progress of the reload *animation* (0 → 1). The animation and its sound cues last the whole
+   * reload (RELOAD_ANIM_SHARE). 1 when not reloading.
    */
   get reloadAnimProgress() {
     if (this.reloadTimer <= 0) return 1;
     const elapsed = this.weapon.reloadTime - this.reloadTimer;
-    return Math.min(1, elapsed / Math.min(1.3, this.weapon.reloadTime * 0.55));
+    return Math.min(1, elapsed / (this.weapon.reloadTime * RELOAD_ANIM_SHARE));
   }
   get equipProgress() {
     return this.equipTimer > 0 ? 1 - this.equipTimer / this.weapon.equipTime : 1;
   }
   get isAds() {
     return this.ads > 0.5 && this.weapon.altFire === 'ads';
+  }
+  /** View magnification right now (1 = not aiming). */
+  get zoom() {
+    const w = this.weapon;
+    if (w.altFire !== 'ads') return 1;
+    return 1 + ((w.ads.scope ? this.scopeZoom : w.ads.zoom) - 1) * this.ads;
+  }
+  /** Bolt action: seconds into working the bolt after a shot, or −1 when it isn't being worked. */
+  get boltCycleAge() {
+    const w = this.weapon;
+    if (!w.boltAction || this.reloadTimer > 0 || this.equipTimer > 0 || this.slot.ammo <= 0 || this.cooldown <= 0) return -1;
+    return this.lastShotAge;
   }
 
   refill() {
@@ -109,15 +136,36 @@ export class WeaponSystem {
     this.firingError = 0;
   }
 
+  /** Put a different weapon in a slot (full magazine). The gun is re-drawn if it is the one in hand. */
+  setSlot(index: number, id: WeaponId) {
+    const s = this.slots[index];
+    if (!s || s.cfg.id === id) return;
+    const cfg = WEAPONS[id];
+    this.slots[index] = { cfg, ammo: cfg.magazine, reserve: cfg.reserve };
+    if (index !== this.current) return;
+    this.reloadTimer = 0;
+    this.burstQueue = 0;
+    this.adsHeld = false;
+    this.scopeLevel = 0;
+    this.ads = 0;
+    this.recoilIndex = 0;
+    this.firingError = 0;
+    this.cooldown = 0;
+    this.equipTimer = cfg.equipTime * 0.6;
+    this.events.onEquip?.(cfg);
+  }
+
   switchTo(index: number) {
     if (index === this.current || !this.slots[index]) return;
     this.current = index;
     this.reloadTimer = 0;
     this.burstQueue = 0;
     this.adsHeld = false;
+    this.scopeLevel = 0;
     this.ads = 0;
     this.recoilIndex = 0;
     this.firingError = 0;
+    this.cooldown = Math.min(this.cooldown, 0); // a bolt cycle doesn't carry over to the other gun
     this.equipTimer = this.weapon.equipTime;
     this.events.onEquip?.(this.weapon);
   }
@@ -128,6 +176,7 @@ export class WeaponSystem {
     if (!this.infiniteAmmo && s.reserve <= 0) return;
     this.reloadTimer = s.cfg.reloadTime;
     this.adsHeld = false;
+    this.scopeLevel = 0; // reloading takes you out of the scope; it does not come back by itself
     this.burstQueue = 0;
     this.events.onReloadStart?.(s.cfg);
   }
@@ -135,7 +184,8 @@ export class WeaponSystem {
   /** Spread components in degrees for the current state. */
   spread(player: PlayerController): { total: number; movement: number; firing: number; base: number } {
     const w = this.weapon;
-    let base = this.isAds ? w.spread.ads : w.spread.base;
+    // a scope is only accurate once it is all the way up
+    let base = (w.ads.scope ? this.ads > 0.95 : this.isAds) ? w.spread.ads : w.spread.base;
     if (player.crouch > 0.5) base *= w.spread.crouchMult;
     const speedFrac = player.speed / (RUN_SPEED * w.runSpeedMult);
     let movement = w.spread.moveMax * smoothstep(w.spread.accurateSpeedFraction, 1, speedFrac);
@@ -179,10 +229,31 @@ export class WeaponSystem {
       if (input.consume('secondary')) this.switchTo(1);
       if (input.consume('swap')) this.switchTo(this.current === 0 ? 1 : 0);
       if (input.consume('reload')) this.startReload();
-      this.adsHeld = w.altFire === 'ads' && input.isDown('alt') && this.reloadTimer <= 0 && this.equipTimer <= 0;
+      const ready = this.reloadTimer <= 0 && this.equipTimer <= 0;
+      if (w.altFire === 'ads' && w.ads.scope) {
+        // scope: each right click goes one step on (not scoped → zoom → second zoom → not scoped)
+        const click = input.consume('alt');
+        // while the bolt is worked the scope is down and comes back by itself
+        const bolting = !!w.boltAction && this.cooldown > RESCOPE_LEAD;
+        if (click && ready) {
+          // a click while the scope is down for the bolt calls the return off
+          if (bolting && this.scopeLevel > 0) this.scopeLevel = 0;
+          else this.scopeLevel = (this.scopeLevel + 1) % (w.ads.zoom2 ? 3 : 2);
+        }
+        this.adsHeld = this.scopeLevel > 0 && ready && !bolting;
+      } else {
+        this.adsHeld = w.altFire === 'ads' && input.isDown('alt') && ready;
+      }
       if (w.altFire === 'burst' && input.consume('alt')) this.tryBurst();
     } else {
       this.adsHeld = false;
+      this.scopeLevel = 0;
+    }
+    if (w.ads.scope) {
+      const target = this.scopeLevel === 2 ? (w.ads.zoom2 ?? w.ads.zoom) : w.ads.zoom;
+      // coming up from the hip the scope opens at its level; between levels it glides
+      if (this.ads < 0.02) this.scopeZoom = target;
+      else if (this.scopeLevel > 0) this.scopeZoom += (target - this.scopeZoom) * (1 - Math.exp(-dt * 16));
     }
 
     // ADS blend
@@ -226,8 +297,11 @@ export class WeaponSystem {
       const rate = w.fireRate * (this.isAds ? w.ads.fireRateMult : 1);
       const interval = 1 / rate;
       this.fireOne(player, 0);
-      // carry sub-frame remainder so the fire rate does not depend on frame rate
-      this.cooldown = Math.max(this.cooldown, -interval * 0.5) + interval;
+      // carry sub-frame remainder so the fire rate does not depend on frame rate (never more than this
+      // step's worth: a gun that has been ready for a while starts a full interval)
+      this.cooldown = Math.max(this.cooldown, -Math.min(dt, interval * 0.5)) + interval;
+      // bolt action: nothing to chamber after the last round, so the reload follows the shot
+      if (w.boltAction && this.slot.ammo === 0) this.cooldown = LAST_ROUND_DELAY;
     } else if (!wantsFire) {
       this.cooldown = Math.max(0, this.cooldown);
     }

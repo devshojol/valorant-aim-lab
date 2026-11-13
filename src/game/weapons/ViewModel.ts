@@ -1,4 +1,6 @@
 import type { WeaponId } from '../../types';
+import { WEAPONS } from './weaponConfigs';
+import { PISTOL_HOLD_UP } from './holds';
 import {
   Color3,
   CreateBox,
@@ -15,16 +17,19 @@ import {
   type Scene,
 } from '../rendering/babylon';
 import { muzzleFlashTexture } from '../rendering/textures';
-import type { WeaponSystem } from './WeaponSystem';
+import { BOLT_CYCLE, smoothstep, type WeaponSystem } from './WeaponSystem';
 import type { PlacedSkin, WeaponSkin } from './WeaponSkins';
 import { FirstPersonArms, type ArmsTemplate } from './FirstPersonArms';
 import type { AnimatedArms } from './AnimatedArms';
+import type { PistolArms } from './PistolArms';
 
 interface GunModel {
   root: TransformNode;
   mag: TransformNode | null;
   /** Magazine rest height (its position.y when seated). */
   magBase: number;
+  /** Magazine rest position sideways (pistols; read when first needed). */
+  magX?: number;
   muzzle: TransformNode;
   hip: [number, number, number];
   adsPos: [number, number, number];
@@ -33,12 +38,128 @@ interface GunModel {
   /** Where the hands hold the gun (gun-root space). With arms, the support point is the handguard's underside centre. */
   gripLocal: Vector3;
   supportLocal: Vector3 | null;
+  /** Pistols: the bottom of the grip under the grip point (gun-root space), where the left hand goes. */
+  gripBottomLocal?: Vector3;
+  /** The magazine is a stand-in inside a skin's grip: shown only while it is out of the gun. */
+  magHidden?: boolean;
+  /**
+   * Bolt (bolt action): a pivot on the bolt's axis that carries the bolt mesh, and the tip of its handle
+   * at rest (gun-root space).
+   */
+  bolt?: { pivot: TransformNode; rest: Vector3; handle: Vector3 };
   /** Revolver cylinder: rest rotation, current and target turn (radians). */
   cylinder?: { node: TransformNode; rest: Quaternion; angle: number; target: number; step: number };
 }
 
 const VM_GROUP = 1;
+/** Animated arms: how far a pistol is moved from its hip position (sideways, up; metres). */
+const PISTOL_TWO_HAND_LIFT = [-0.025, 0.06];
 const tmpCyl = new Quaternion();
+/** Bolt action: how far the handle is turned up (radians) and the bolt drawn back (metres). */
+const BOLT_LIFT = 0.7;
+const BOLT_TRAVEL = 0.075;
+/**
+ * Where the hand's grasp goes, measured from the tip of the bolt handle: out, up, forward (metres). It takes
+ * the handle from below, so the hand stays beside the receiver instead of rising in front of the view.
+ */
+const BOLT_GRASP = new Vector3(0, -0.05, -0.02);
+
+/**
+ * Working the bolt, `age` seconds after the shot (−1 = not being worked): how far the trigger hand has
+ * gone to the handle, how far the handle is lifted and the bolt drawn back, and how far the gun is canted.
+ */
+function boltPose(age: number, fireRate: number) {
+  if (age < 0) return { reach: 0, lift: 0, back: 0, cant: 0 };
+  const C = BOLT_CYCLE;
+  const t = age * fireRate * C.per; // the timeline is written for one shot every `per` seconds
+  const reach = smoothstep(C.reach, C.lift, t) * (1 - smoothstep(C.release, C.done, t));
+  const lift = smoothstep(C.lift, C.back, t) * (1 - smoothstep(C.down, C.release, t));
+  const back = smoothstep(C.back, C.forward - 0.03, t) * (1 - smoothstep(C.forward, C.down, t));
+  const cant = smoothstep(C.reach - 0.04, C.lift, t) * (1 - smoothstep(C.release, C.done, t));
+  return { reach, lift, back, cant };
+}
+
+/** A pistol reload pose: offsets added to the gun's hip pose, the magazine, and the left hand. */
+interface PistolReloadPose {
+  /** Gun position offset (view space, metres) and rotation offset (pitch, yaw, roll; radians). */
+  pos: Vector3;
+  rot: Vector3;
+  /** Magazine relative to its seat (gun space): sideways, down, and its spin about the barrel axis. */
+  mag: { x: number; drop: number; spin: number };
+  /** Left hand, as offsets from its hold under the grip: along the view's axes and along the gun's. */
+  hand: { view: Vector3; gun: Vector3 };
+}
+
+/** 0 → 1 → 0 over `from`…`to`. */
+function bump(t: number, from: number, to: number) {
+  return Math.sin(Math.max(0, Math.min(1, (t - from) / (to - from))) * Math.PI);
+}
+
+/**
+ * Moments of the magazine-pistol reload (share of the reload): the magazine is thrown clear, the new
+ * one is seated, and the slide is released (only after an empty magazine).
+ */
+const PISTOL_RELOAD = { out: 0.14, in: 0.56, slide: 0.7 };
+/** The same for the revolver: the cylinder opens, and the rounds go in. */
+const REVOLVER_RELOAD = { out: 0.14, in: 0.62 };
+
+/**
+ * The magazine-pistol reload at progress `t` (0 → 1), in the close, fast style of a competition
+ * shooter:
+ *  - the gun is pulled back and up into the middle of the view, just under the sight line, canted
+ *    hard inwards with the muzzle up, while the left hand is already on its way to a new magazine;
+ *  - a flick of the wrist throws the old magazine clear to the side;
+ *  - the left hand comes up along the line of the grip and drives the new magazine home (the gun jolts);
+ *  - after an empty magazine the slide is released (a short snap);
+ *  - the left hand re-grips as the gun is punched straight back out, a little past its rest and back.
+ */
+function magazineReload(t: number, empty: boolean): PistolReloadPose {
+  const R = PISTOL_RELOAD;
+  const work = smoothstep(0, R.out, t) * (1 - smoothstep(0.72, 0.92, t));
+  const flick = bump(t, R.out - 0.04, R.out + 0.07);
+  const seat = bump(t, R.in - 0.03, R.in + 0.08);
+  const slide = empty ? bump(t, R.slide - 0.02, R.slide + 0.06) : 0;
+  const punch = bump(t, 0.78, 1);
+  const pos = new Vector3(-0.06 * work - 0.015 * flick, 0.02 * work + 0.02 * seat, -0.09 * work - 0.012 * slide + 0.025 * punch);
+  const rot = new Vector3(-0.3 * work - 0.07 * seat - 0.05 * slide + 0.03 * punch, -0.15 * work - 0.1 * flick, -0.8 * work - 0.3 * flick);
+
+  // old magazine: thrown out along the canted grip and to the side, spinning; then the new one comes
+  // up from out of view into the grip
+  const out = Math.max(0, Math.min(1, (t - R.out) / 0.16));
+  const back = smoothstep(0.36, R.in, t);
+  const mag = t < 0.33 ? { x: -0.14 * out, drop: 0.1 * out + 0.5 * out * out, spin: 2.6 * out } : { x: 0, drop: (1 - back) * 0.45, spin: 0 };
+
+  // left hand: off the gun straight away, down and back out of view; then, still out of view, under
+  // the new magazine, which it carries up into the grip; then back to its hold
+  const away = smoothstep(0, 0.1, t) * (1 - smoothstep(0.62, 0.8, t));
+  const carry = smoothstep(0.3, 0.36, t);
+  const hand = {
+    view: new Vector3(-0.2, -0.4, -0.3).scaleInPlace((1 - carry) * away),
+    gun: new Vector3(0, -(t < 0.33 ? 0.45 : mag.drop), 0).scaleInPlace(carry * away),
+  };
+  return { pos, rot, mag, hand };
+}
+
+/**
+ * The revolver reload at progress `t` (0 → 1): the gun tips up and rolls inwards, the left hand drops
+ * out of view for the rounds, comes up to the cylinder, then both return.
+ */
+function revolverReload(t: number): PistolReloadPose {
+  const R = REVOLVER_RELOAD;
+  const tilt = smoothstep(0, R.out, t) * (1 - smoothstep(0.74, 0.92, t));
+  const seat = bump(t, R.in - 0.03, R.in + 0.09);
+  const back = smoothstep(0.4, R.in, t);
+  const away = smoothstep(0.02, 0.16, t) * (1 - smoothstep(0.7, 0.88, t));
+  return {
+    pos: new Vector3(-0.05 * tilt, 0.05 * tilt + 0.012 * seat, 0),
+    rot: new Vector3(-0.2 * tilt - 0.05 * seat, 0, -0.5 * tilt),
+    mag: { x: 0, drop: 0, spin: 0 },
+    hand: {
+      view: new Vector3(-0.2, -0.4, -0.3).scaleInPlace((1 - back) * away),
+      gun: new Vector3(-0.01, 0.06, 0.07).scaleInPlace(back * away),
+    },
+  };
+}
 
 export class ViewModel {
   private readonly holder: TransformNode;
@@ -54,6 +175,8 @@ export class ViewModel {
   private arms: FirstPersonArms | null = null;
   /** Animated arms pack (replaces `arms` when loaded). */
   private animArms: AnimatedArms | null = null;
+  /** Animated pistol arms pack: holds the sidearms in place of `animArms` when loaded. */
+  private pistolArms: PistolArms | null = null;
   private wasReloading = false;
   private reloadEmpty = false;
   private lastHands: { grip: [number, number, number]; front: [number, number, number] | null } = { grip: [0, -0.075, -0.08], front: null };
@@ -75,6 +198,14 @@ export class ViewModel {
         console.warn('[viewmodel] animated arms unavailable', err);
       }
     }
+    if (this.animArms && armsTemplate?.pistolRig) {
+      try {
+        this.pistolArms = armsTemplate.pistolRig.createArms(this.holder, VM_GROUP);
+        this.pistolArms.setVisible(false);
+      } catch (err) {
+        console.warn('[viewmodel] pistol arms unavailable', err);
+      }
+    }
     if (armsTemplate && !this.animArms) {
       try {
         // the skinned glove model when loaded, otherwise the built-in arms
@@ -83,14 +214,7 @@ export class ViewModel {
         console.warn('[viewmodel] first-person arms unavailable', err);
       }
     }
-    for (const id of weaponIds) {
-      const skin = skins.get(id);
-      const gun = (skin ? this.buildSkinned(id, skin) : this.build(id)) as GunModel;
-      gun.gripLocal = new Vector3(...this.lastHands.grip);
-      gun.supportLocal = this.lastHands.front ? new Vector3(...this.lastHands.front) : null;
-      if ((this.arms || this.animArms) && gun.supportLocal) gun.supportLocal = this.handguardUnderside(gun.root, gun.supportLocal);
-      this.guns.set(id, gun);
-    }
+    for (const id of weaponIds) this.addWeapon(id, skins.get(id));
 
     const fm = new StandardMaterial('vm-flash', scene);
     fm.diffuseTexture = muzzleFlashTexture(scene);
@@ -107,6 +231,18 @@ export class ViewModel {
     this.flash.setEnabled(false);
   }
 
+  /** Build the first-person model for a weapon (no-op if it already exists). New guns start hidden. */
+  addWeapon(id: WeaponId, skin?: WeaponSkin) {
+    if (this.guns.has(id)) return;
+    const gun = (skin ? this.buildSkinned(id, skin) : this.build(id)) as GunModel;
+    gun.gripLocal = new Vector3(...this.lastHands.grip);
+    gun.supportLocal = this.lastHands.front ? new Vector3(...this.lastHands.front) : null;
+    if ((this.arms || this.animArms) && gun.supportLocal) gun.supportLocal = this.handguardUnderside(gun.root, gun.supportLocal);
+    if (this.animArms && WEAPONS[id].slot === 'secondary') gun.gripBottomLocal = this.handguardUnderside(gun.root, gun.gripLocal);
+    if (this.currentId !== null) gun.root.setEnabled(false);
+    this.guns.set(id, gun);
+  }
+
   /**
    * The bottom of the handguard around the support-hand point (gun-root space), measured from the
    * gun's own meshes, so the arm's palm rests against it whatever the model. Falls back to `near`.
@@ -121,6 +257,7 @@ export class ViewModel {
     let xMin = Infinity;
     let xMax = -Infinity;
     for (const m of root.getChildMeshes(false)) {
+      if (!m.isEnabled()) continue; // a stand-in magazine hidden inside the grip
       const pos = m.getVerticesData('position');
       const idx = m.getIndices();
       if (!pos || !idx) continue;
@@ -278,6 +415,90 @@ export class ViewModel {
       muzzle.position.set(0, 0.02, 0.23);
       return { root, mag: null, magBase: 0, muzzle, hip: [0.15, -0.165, 0.48], adsPos: [0, -0.068, 0.34], flashScale: 0.9 };
     }
+    if (id === 'spectre') {
+      const body = this.mat('spectre-body', '#343844', 0.3);
+      const accent = this.mat('spectre-accent', '#8e7cc3', 0.3, '#1c1830');
+      this.part(root, 'box', [0.058, 0.085, 0.26], [0, 0, 0.02], body); // receiver
+      this.part(root, 'box', [0.06, 0.012, 0.24], [0, 0.048, 0.02], accent); // top rail
+      this.part(root, 'box', [0.05, 0.05, 0.1], [0, -0.012, 0.19], body); // handguard
+      this.part(root, 'cyl', [0.042, 0, 0.2], [0, 0.008, 0.33], dark); // suppressor
+      this.part(root, 'box', [0.03, 0.03, 0.2], [0, 0.012, -0.2], metal); // stock tube
+      this.part(root, 'box', [0.04, 0.08, 0.03], [0, -0.005, -0.31], dark); // butt plate
+      this.part(root, 'box', [0.03, 0.03, 0.04], [0, 0.07, 0.0], dark); // rear sight
+      const m = new TransformNode('vm-mag', this.scene);
+      m.parent = root;
+      m.position.set(0, -0.105, 0.06);
+      this.part(m, 'box', [0.03, 0.15, 0.04], [0, 0, 0], accent, [0.06, 0, 0]);
+      mag = m;
+      this.part(root, 'box', [0.04, 0.09, 0.05], [0, -0.075, -0.06], dark, [-0.3, 0, 0]); // grip
+      this.hands(root, [0, -0.05, 0.19], [0.005, -0.075, -0.065]);
+      muzzle.position.set(0, 0.008, 0.44);
+      return { root, mag, magBase: mag.position.y, muzzle, hip: [0.17, -0.19, 0.56], adsPos: [0, -0.108, 0.38], flashScale: 0.4 };
+    }
+    if (id === 'guardian') {
+      const body = this.mat('guardian-body', '#3a4034', 0.25);
+      const accent = this.mat('guardian-accent', '#9fb86a', 0.25);
+      this.part(root, 'box', [0.06, 0.08, 0.36], [0, 0, 0], body); // receiver
+      this.part(root, 'box', [0.064, 0.055, 0.26], [0, -0.004, 0.3], accent); // long handguard
+      this.part(root, 'cyl', [0.022, 0, 0.3], [0, 0.012, 0.56], metal); // barrel
+      this.part(root, 'box', [0.04, 0.035, 0.07], [0, 0.012, 0.72], dark); // muzzle brake
+      this.part(root, 'box', [0.045, 0.09, 0.2], [0, -0.02, -0.26], body, [0.1, 0, 0]); // stock
+      this.part(root, 'box', [0.062, 0.012, 0.34], [0, 0.045, 0.04], dark); // rail
+      this.part(root, 'box', [0.012, 0.03, 0.012], [0, 0.065, 0.4], dark); // front sight
+      this.part(root, 'box', [0.03, 0.022, 0.03], [0, 0.056, -0.06], dark); // rear sight
+      const m = new TransformNode('vm-mag', this.scene);
+      m.parent = root;
+      m.position.set(0, -0.075, 0.07);
+      this.part(m, 'box', [0.04, 0.085, 0.06], [0, 0, 0], dark);
+      mag = m;
+      this.part(root, 'box', [0.04, 0.09, 0.05], [0, -0.075, -0.07], dark, [-0.3, 0, 0]); // grip
+      this.hands(root, [0, -0.05, 0.3], [0.005, -0.075, -0.075]);
+      muzzle.position.set(0, 0.012, 0.77);
+      return { root, mag, magBase: mag.position.y, muzzle, hip: [0.17, -0.19, 0.6], adsPos: [0, -0.104, 0.38], flashScale: 1 };
+    }
+    if (id === 'operator') {
+      const body = this.mat('operator-body', '#2c3b3a', 0.25);
+      const accent = this.mat('operator-accent', '#5f8f8a', 0.3);
+      const glass = this.mat('operator-glass', '#0d1a22', 0.9, '#0a2a3a');
+      this.part(root, 'box', [0.065, 0.085, 0.42], [0, 0, 0], body); // receiver
+      this.part(root, 'box', [0.068, 0.06, 0.24], [0, -0.008, 0.32], accent); // handguard
+      this.part(root, 'cyl', [0.03, 0, 0.52], [0, 0.014, 0.7], metal); // heavy barrel
+      this.part(root, 'box', [0.06, 0.05, 0.1], [0, 0.014, 1.0], dark); // muzzle brake
+      this.part(root, 'box', [0.048, 0.095, 0.18], [0, -0.03, -0.27], body, [0.08, 0, 0]); // stock
+      this.part(root, 'cyl', [0.036, 0, 0.26], [0, 0.08, 0.14], dark); // scope tube (kept slim and forward so it doesn't fill the view)
+      this.part(root, 'cyl', [0.05, 0, 0.07], [0, 0.08, 0.29], dark); // objective bell
+      this.part(root, 'cyl', [0.042, 0, 0.004], [0, 0.08, 0.327], glass); // front lens
+      this.part(root, 'cyl', [0.042, 0, 0.04], [0, 0.08, 0.0], dark); // eyepiece
+      this.part(root, 'box', [0.02, 0.03, 0.03], [0, 0.052, 0.07], dark); // scope mounts
+      this.part(root, 'box', [0.02, 0.03, 0.03], [0, 0.052, 0.21], dark);
+      this.part(root, 'cyl', [0.014, 0, 0.07], [0.05, 0.01, -0.1], metal, [0, 0, 0]).rotation.set(Math.PI / 2, 0, Math.PI / 2 - 0.5); // bolt handle
+      const m = new TransformNode('vm-mag', this.scene);
+      m.parent = root;
+      m.position.set(0, -0.075, 0.06);
+      this.part(m, 'box', [0.045, 0.07, 0.09], [0, 0, 0], dark);
+      mag = m;
+      this.part(root, 'box', [0.042, 0.09, 0.05], [0, -0.08, -0.09], dark, [-0.3, 0, 0]); // grip
+      this.hands(root, [0, -0.055, 0.3], [0.005, -0.08, -0.095]);
+      muzzle.position.set(0, 0.014, 1.06);
+      return { root, mag, magBase: mag.position.y, muzzle, hip: [0.18, -0.2, 0.58], adsPos: [0, -0.15, 0.3], flashScale: 1.5 };
+    }
+    if (id === 'ghost') {
+      const slide = this.mat('ghost-slide', '#2a2e36', 0.4);
+      const frame = this.mat('ghost-frame', '#6f7f95', 0.2);
+      this.part(root, 'box', [0.034, 0.04, 0.18], [0, 0.015, 0.04], slide);
+      this.part(root, 'box', [0.032, 0.03, 0.15], [0, -0.012, 0.04], frame);
+      this.part(root, 'cyl', [0.036, 0, 0.14], [0, 0.015, 0.2], dark); // suppressor
+      this.part(root, 'box', [0.032, 0.1, 0.045], [0, -0.065, -0.03], frame, [-0.3, 0, 0]);
+      this.part(root, 'box', [0.008, 0.015, 0.008], [0, 0.04, 0.12], dark);
+      const m = new TransformNode('vm-mag', this.scene);
+      m.parent = root;
+      m.position.set(0, -0.11, -0.04);
+      this.part(m, 'box', [0.026, 0.02, 0.035], [0, 0, 0], dark);
+      mag = m;
+      this.hands(root, null, [0.004, -0.065, -0.035]);
+      muzzle.position.set(0, 0.015, 0.275);
+      return { root, mag, magBase: mag.position.y, muzzle, hip: [0.15, -0.165, 0.48], adsPos: [0, -0.068, 0.36], flashScale: 0.35 };
+    }
     // classic
     const slide = this.mat('classic-slide', '#3a3f47', 0.35);
     const frame = this.mat('classic-frame', '#9aa4ad', 0.2);
@@ -297,11 +518,11 @@ export class ViewModel {
 
   /** First-person gun built from a weapon skin (GLB), placed so its grip sits in the trigger hand. */
   private buildSkinned(id: WeaponId, skin: WeaponSkin): Omit<GunModel, 'gripLocal' | 'supportLocal'> {
-    const pistol = id === 'sheriff' || id === 'classic';
+    const pistol = WEAPONS[id].slot === 'secondary';
     const root = new TransformNode(`vm-${id}`, this.scene);
     root.parent = this.holder;
     const grip = pistol ? new Vector3(0.004, -0.07, -0.085) : new Vector3(0.005, -0.075, -0.08);
-    const placed = skin.place(root, pistol ? 0.34 : 0.92, grip);
+    const placed = skin.place(root, skin.spec.viewLength ?? (pistol ? 0.34 : 0.92), grip);
     for (const m of placed.meshes) {
       m.renderingGroupId = VM_GROUP;
       m.isPickable = false;
@@ -320,6 +541,44 @@ export class ViewModel {
       for (const n of [mag, placed.holder, ...placed.holder.getDescendants(false)]) (n as TransformNode).computeWorldMatrix?.(true);
       placed.mag.setParent(mag);
     }
+    // Pistol skins are one joined mesh: a plain magazine hidden in the grip stands in for the reload.
+    let magHidden = false;
+    if (pistol && !mag && id !== 'sheriff') {
+      mag = new TransformNode(`vm-${id}-mag`, this.scene);
+      mag.parent = root;
+      mag.position.set(grip.x, grip.y - 0.015, grip.z);
+      this.part(mag, 'box', [0.022, 0.1, 0.032], [0, 0, 0], this.mat('dark', '#2e333b', 0.25), [-0.25, 0, 0]);
+      mag.setEnabled(false);
+      magHidden = true;
+    }
+    // Bolt: carried by a pivot on its axis, so it can turn about the axis and slide along it.
+    let bolt: GunModel['bolt'];
+    if (placed.bolt && placed.boltAxis) {
+      const pivot = new TransformNode(`vm-${id}-bolt`, this.scene);
+      pivot.parent = root;
+      pivot.position.copyFrom(placed.boltAxis);
+      for (const n of [root, pivot, placed.holder, ...placed.holder.getDescendants(false)]) (n as TransformNode).computeWorldMatrix?.(true);
+      // the handle's tip: the bolt's vertex furthest from the axis
+      const inv = root.getWorldMatrix().clone().invert();
+      const handle = placed.boltAxis.clone();
+      let far = 0;
+      const v = new Vector3();
+      for (const m of [placed.bolt, ...placed.bolt.getChildMeshes(false)]) {
+        const pos = (m as Mesh).getVerticesData?.('position');
+        if (!pos) continue;
+        const toRoot = m.getWorldMatrix().multiply(inv);
+        for (let i = 0; i < pos.length; i += 3) {
+          Vector3.TransformCoordinatesFromFloatsToRef(pos[i], pos[i + 1], pos[i + 2], toRoot, v);
+          const d = Math.hypot(v.x - placed.boltAxis.x, v.y - placed.boltAxis.y);
+          if (d > far) {
+            far = d;
+            handle.copyFrom(v);
+          }
+        }
+      }
+      placed.bolt.setParent(pivot);
+      bolt = { pivot, rest: pivot.position.clone(), handle };
+    }
     let cylinder: GunModel['cylinder'];
     if (placed.cylinder) {
       const node = placed.cylinder;
@@ -334,18 +593,21 @@ export class ViewModel {
     return {
       root,
       mag,
-      magBase: 0,
+      magBase: mag?.position.y ?? 0,
+      magHidden,
       muzzle,
       hip: pistol ? [0.15, -0.165, 0.48] : [0.17, -0.19, 0.6],
       adsPos: [0, adsY, pistol ? 0.34 : 0.4],
-      flashScale: id === 'phantom' ? 0.45 : pistol ? 0.9 : 1,
+      flashScale: WEAPONS[id].suppressed ? 0.45 : pistol ? 0.9 : 1,
       skin: placed,
       cylinder,
+      bolt,
     };
   }
 
   onShot() {
-    this.animArms?.fire();
+    if (this.currentId && WEAPONS[this.currentId].slot === 'secondary' && this.pistolArms) this.pistolArms.fire();
+    else this.animArms?.fire();
     this.kick = Math.min(1.4, this.kick + 1);
     this.flashTime = 0.045;
     const cyl = this.currentId ? this.guns.get(this.currentId)?.cylinder : undefined;
@@ -362,6 +624,10 @@ export class ViewModel {
     if (!gun) return;
     gun.root.setEnabled(this.visible);
     this.arms?.setVisible(this.visible);
+    // sidearms have their own animated arms (a two-handed pistol hold); the rifle arms step aside for them
+    const pistolRig = WEAPONS[id].slot === 'secondary' ? this.pistolArms : null;
+    this.animArms?.setVisible(this.visible && !pistolRig);
+    this.pistolArms?.setVisible(this.visible && !!pistolRig);
     if (!this.visible) {
       this.flash.setEnabled(false);
       return;
@@ -385,15 +651,60 @@ export class ViewModel {
 
     const equip = ws.equipProgress;
     const equipDrop = (1 - equip) * (1 - equip) * 0.3;
-    const reload = ws.reloadAnimProgress; // the animation finishes early; see WeaponSystem.reloadAnimProgress
+    const reload = ws.reloadAnimProgress; // lasts the whole reload; see WeaponSystem.reloadAnimProgress
     const reloadDip = ws.reloading ? Math.sin(Math.min(1, reload) * Math.PI) : 0;
 
-    const pistol = id === 'sheriff' || id === 'classic';
+    const pistol = WEAPONS[id].slot === 'secondary';
+    // pistols have their own reload (the rifle dip would leave both hands on the gun)
+    const pr = !pistol || !ws.reloading ? null : id === 'sheriff' ? revolverReload(reload) : magazineReload(reload, ws.slot.ammo === 0);
+    const dip = pr ? 0 : reloadDip;
     if (ws.reloading && !this.wasReloading) this.reloadEmpty = ws.slot.ammo === 0;
     this.wasReloading = ws.reloading;
 
-    const rigGun = { root: gun.root, gripLocal: gun.gripLocal, supportLocal: gun.supportLocal, pistol, mag: gun.mag };
-    if (this.animArms && !pistol) {
+    // bolt action: after a shot the trigger hand works the bolt, the gun canted over to show it
+    const bp = boltPose(ws.boltCycleAge, ws.weapon.fireRate);
+    let rightReach: { to: Vector3; blend: number } | null = null;
+    if (gun.bolt) {
+      const b = gun.bolt;
+      const side = b.handle.x >= b.rest.x ? 1 : -1;
+      const ang = bp.lift * BOLT_LIFT * side;
+      b.pivot.rotation.z = ang;
+      b.pivot.position.z = b.rest.z - bp.back * BOLT_TRAVEL;
+      if (bp.reach > 0) {
+        // the handle's tip where the bolt is now, and the hand's grasp around it
+        const dx = b.handle.x - b.rest.x + BOLT_GRASP.x * side;
+        const dy = b.handle.y - b.rest.y + BOLT_GRASP.y;
+        const to = new Vector3(
+          b.rest.x + dx * Math.cos(ang) - dy * Math.sin(ang),
+          b.rest.y + dx * Math.sin(ang) + dy * Math.cos(ang),
+          b.handle.z + BOLT_GRASP.z - bp.back * BOLT_TRAVEL,
+        );
+        rightReach = { to, blend: bp.reach };
+      }
+    }
+    const boltCant = bp.cant * (1 - ads);
+
+    const rigGun = { root: gun.root, gripLocal: gun.gripLocal, supportLocal: gun.supportLocal, pistol, mag: gun.mag, gripBottom: gun.gripBottomLocal ?? null };
+    if (pistolRig) {
+      // the animated pistol arms carry the sidearm: Draw follows the equip, Reload the reload, Shoot each shot
+      pistolRig.update(
+        dt,
+        { root: gun.root, gripLocal: gun.gripLocal, boreY: gun.muzzle.position.y, mag: gun.mag, magHidden: !!gun.magHidden },
+        {
+          equip,
+          reload: ws.reloading ? reload : -1,
+          ads,
+          adsZ: gun.adsPos[2],
+          sightY: -0.035 - gun.adsPos[1],
+          offsetPos: new Vector3(
+            (this.swayX * 0.012 + bobX * 0.6) * hipFactor,
+            (this.swayY * 0.012 - bobY * 0.6) * hipFactor + this.kick * 0.002,
+            -this.kick * 0.012,
+          ),
+          offsetRot: new Vector3(-this.kick * 0.02, this.swayX * 0.03 * hipFactor, this.swayX * 0.02 * hipFactor),
+        },
+      );
+    } else if (this.animArms && !pistol) {
       // the animated arms carry the rifle: Draw follows the equip, Reload the reload, Fire each shot
       const clipSecs = this.animArms.reloadClipSeconds(ws.weapon.reloadTime, this.reloadEmpty);
       const elapsed = ws.reloadProgress * ws.weapon.reloadTime;
@@ -408,40 +719,63 @@ export class ViewModel {
           adsPos: new Vector3(gun.adsPos[0], gun.adsPos[1], gun.adsPos[2]),
           sightY: -0.035 - gun.adsPos[1],
           offsetPos: new Vector3(
-            (this.swayX * 0.012 + bobX * 0.6) * hipFactor,
+            (this.swayX * 0.012 + bobX * 0.6) * hipFactor - boltCant * 0.02,
             (this.swayY * 0.012 - bobY * 0.6) * hipFactor + this.kick * 0.003,
             -this.kick * 0.02,
           ),
           offsetRot: new Vector3(
-            -this.kick * 0.025 + (pistol ? reloadDip * 0.3 : 0),
+            -this.kick * 0.025 + (pistol ? reloadDip * 0.3 : 0) - boltCant * 0.05,
             this.swayX * 0.03 * hipFactor,
-            (pistol ? reloadDip * 0.35 : 0) + this.swayX * 0.02 * hipFactor,
+            (pistol ? reloadDip * 0.35 : 0) + this.swayX * 0.02 * hipFactor + boltCant * 0.2,
           ),
+          rightReach,
         },
       );
     } else {
       const p = gun.root.position;
       p.x = lerp(gun.hip[0], gun.adsPos[0]) + (this.swayX * 0.02 + bobX) * hipFactor;
-      p.y = lerp(gun.hip[1], gun.adsPos[1]) + (this.swayY * 0.02 - bobY) * hipFactor - equipDrop - reloadDip * 0.05 + this.kick * 0.006;
+      p.y = lerp(gun.hip[1], gun.adsPos[1]) + (this.swayY * 0.02 - bobY) * hipFactor - equipDrop - dip * 0.05 + this.kick * 0.006;
       p.z = lerp(gun.hip[2], gun.adsPos[2]) - this.kick * 0.035;
       const r = gun.root.rotation;
-      r.x = -this.kick * 0.06 + equipDrop * 1.6 + reloadDip * 0.35;
+      r.x = -this.kick * 0.06 + equipDrop * 1.6 + dip * 0.35;
       r.y = (this.swayX * 0.05 - 0.05) * hipFactor;
-      r.z = reloadDip * 0.5 + this.swayX * 0.04 * hipFactor;
+      r.z = dip * 0.5 + this.swayX * 0.04 * hipFactor + boltCant * 0.2;
+      if (pr) {
+        p.addInPlace(pr.pos);
+        r.addInPlace(pr.rot);
+      }
+      if (pistol && this.animArms) {
+        // both hands are on the gun: hold it higher and nearer the middle so the lower hand is in view
+        // on a wide screen too (not when aiming down the sights)
+        p.x += PISTOL_TWO_HAND_LIFT[0] * (1 - ads);
+        p.y += PISTOL_TWO_HAND_LIFT[1] * (1 - ads);
+      }
 
       if (this.animArms) {
         // pistols: the gun is placed here and the animated arms are solved onto it
         (this.holder.parent as TransformNode).computeWorldMatrix(true);
         this.holder.computeWorldMatrix(true);
         gun.root.computeWorldMatrix(true);
-        this.animArms.update(dt, rigGun, { equip, reload: -1, reloadEmpty: false, ads, adsPos: Vector3.Zero(), sightY: 0, offsetPos: Vector3.Zero(), offsetRot: Vector3.Zero() });
+        this.animArms.update(dt, rigGun, {
+          equip,
+          reload: -1,
+          reloadEmpty: false,
+          ads,
+          adsPos: Vector3.Zero(),
+          sightY: 0,
+          offsetPos: Vector3.Zero(),
+          offsetRot: Vector3.Zero(),
+          leftOffset: pr?.hand ?? null,
+        });
       } else if (this.arms) {
         // solve the arms onto this frame's gun pose
         (this.holder.parent as TransformNode).computeWorldMatrix(true);
         this.holder.computeWorldMatrix(true);
         const W = gun.root.computeWorldMatrix(true);
+        // sidearms: the hands close round the middle of the short grip, not below it (as in AnimatedArms)
+        const gripAt = pistol ? gun.gripLocal.add(new Vector3(0, PISTOL_HOLD_UP, 0)) : gun.gripLocal;
         this.arms.pose({
-          grip: Vector3.TransformCoordinates(gun.gripLocal, W),
+          grip: Vector3.TransformCoordinates(gripAt, W),
           support: gun.supportLocal ? Vector3.TransformCoordinates(gun.supportLocal, W) : null,
           right: Vector3.TransformNormal(Vector3.Right(), W).normalize(),
           up: Vector3.TransformNormal(Vector3.Up(), W).normalize(),
@@ -450,7 +784,14 @@ export class ViewModel {
         });
       }
 
-      if (gun.mag) {
+      if (gun.mag && pistol) {
+        const m = pr?.mag;
+        gun.magX ??= gun.mag.position.x;
+        gun.mag.position.x = gun.magX + (m?.x ?? 0);
+        gun.mag.position.y = gun.magBase - (m?.drop ?? 0);
+        gun.mag.rotation.z = m?.spin ?? 0;
+        if (gun.magHidden) gun.mag.setEnabled((m?.drop ?? 0) > 0.004);
+      } else if (gun.mag) {
         // magazine drops out and returns during reload
         const t = ws.reloading ? reload : 1;
         const out = t < 0.3 ? t / 0.3 : t < 0.6 ? 1 : 1 - (t - 0.6) / 0.3;
@@ -489,20 +830,29 @@ export class ViewModel {
   }
 
   /**
-   * Progress (0 → 1) of the reload as animated, for timing the synthesized reload cues: the animated
-   * arms' reload clip when they're holding a rifle, otherwise the gun's own (faster) reload animation.
+   * When the reload's sounds belong, in seconds from the start of the current weapon's reload: the
+   * magazine coming out, the new one going in, and the bolt (rifles) or slide (a pistol run empty). They follow whichever
+   * animation is shown: the animated arms' reload clip on a rifle, the pistol reload, or the simple
+   * magazine drop.
    */
-  reloadCueProgress(ws: WeaponSystem): number {
-    const id = ws.weapon.id;
-    if (this.animArms && id !== 'sheriff' && id !== 'classic' && ws.reloading) {
-      const secs = this.animArms.reloadClipSeconds(ws.weapon.reloadTime, this.reloadEmpty);
-      return Math.min(1, (ws.reloadProgress * ws.weapon.reloadTime) / secs);
+  reloadCueTimes(ws: WeaponSystem): { out: number; in: number; bolt: number | null } {
+    const T = ws.weapon.reloadTime;
+    if (ws.weapon.id === 'sheriff') return { out: REVOLVER_RELOAD.out * T, in: REVOLVER_RELOAD.in * T, bolt: null };
+    if (ws.weapon.slot === 'secondary' && this.pistolArms) {
+      // the clip is an empty reload: the slide is only heard going forward when the magazine ran dry
+      const c = this.pistolArms.reloadCueTimes(T);
+      return { out: c.out, in: c.in, bolt: ws.slot.ammo === 0 ? c.slide : null };
     }
-    return ws.reloadAnimProgress;
+    if (ws.weapon.slot === 'secondary') {
+      return { out: PISTOL_RELOAD.out * T, in: PISTOL_RELOAD.in * T, bolt: ws.slot.ammo === 0 ? PISTOL_RELOAD.slide * T : null };
+    }
+    if (this.animArms) return this.animArms.reloadCueTimes(T, ws.slot.ammo === 0);
+    return { out: 0.08 * T, in: 0.85 * T, bolt: 0.93 * T };
   }
 
   dispose() {
     this.animArms?.dispose();
+    this.pistolArms?.dispose();
     this.arms?.dispose();
     for (const g of this.guns.values()) g.skin?.dispose();
     this.holder.dispose(false, true);

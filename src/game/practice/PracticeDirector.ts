@@ -3,7 +3,8 @@
  * and mode-specific bookkeeping (escapes, bait shots, deathmatch spawns).
  */
 
-import type { EnemySpot, MapLocation, PracticeConfig, SpawnPoint } from '../../types';
+import type { BotWeapons, EnemySpot, MapLocation, PracticeConfig, SpawnPoint, WeaponId } from '../../types';
+import { WEAPONS } from '../weapons/weaponConfigs';
 import { Bot, type BotContext } from '../bots/Bot';
 import type { BotView } from '../bots/BotVisual';
 import { DeathmatchBehavior } from '../bots/behaviors/DeathmatchBehavior';
@@ -38,6 +39,31 @@ export function spotUsableFrom(world: MapData['world'], spawn: SpawnPoint, spot:
   const info = analysePeekLine(world, eye, spot.cover[0], spot.cover[1], spot.cover[2], spot.peekDir[0], spot.peekDir[1], spot.maxPeek);
   return info.exposeAt !== null && info.hideAt !== null;
 }
+
+/** Weighted pools bots draw their gun from. The sniper is left out: a body shot from it kills. */
+const BOT_WEAPON_POOLS: Record<Exclude<BotWeapons, 'mirror'>, [WeaponId, number][]> = {
+  mixed: [
+    ['vandal', 3],
+    ['phantom', 3],
+    ['spectre', 2],
+    ['guardian', 1],
+    ['sheriff', 1],
+    ['ghost', 1],
+    ['classic', 1],
+  ],
+  rifles: [
+    ['vandal', 1],
+    ['phantom', 1],
+  ],
+  pistols: [
+    ['classic', 2],
+    ['ghost', 2],
+    ['sheriff', 1],
+  ],
+};
+
+/** How long a bot keeps its firing slot after it last asked to shoot (seconds). */
+const ATTACK_SLOT_HOLD = 1.2;
 
 interface PendingRespawn {
   bot: Bot;
@@ -101,6 +127,36 @@ export class PracticeDirector {
     return this.d.config.mode;
   }
 
+  private attackers = new Map<Bot, number>();
+
+  /** Pick a gun for a bot that is (re)spawning. */
+  private pickWeapon(rng: () => number): WeaponId {
+    const mode = this.d.config.botWeapons ?? 'mixed';
+    if (mode === 'mirror') return this.d.config.primary === 'operator' ? 'vandal' : this.d.config.primary;
+    const pool = BOT_WEAPON_POOLS[mode] ?? BOT_WEAPON_POOLS.mixed;
+    let r = rng() * pool.reduce((a, [, w]) => a + w, 0);
+    for (const [id, w] of pool) {
+      r -= w;
+      if (r <= 0) return id;
+    }
+    return pool[0][0];
+  }
+
+  /**
+   * Limit how many bots shoot at once (tuning.maxAttackers, 0 = no limit). A bot that is allowed to
+   * fire holds its slot for a moment after it last asked, so bursts are not cut in half.
+   */
+  mayFire(bot: Bot, time: number): boolean {
+    const max = this.d.config.tuning.maxAttackers ?? 0;
+    if (max <= 0) return true;
+    for (const [b, t] of this.attackers) if (!b.alive || time - t > ATTACK_SLOT_HOLD) this.attackers.delete(b);
+    if (this.attackers.has(bot) || this.attackers.size < max) {
+      this.attackers.set(bot, time);
+      return true;
+    }
+    return false;
+  }
+
   private makeBot(): Bot {
     const visual = this.d.createVisual ? this.d.createVisual(Bot.nextId) : null;
     const bot = new Bot(this.d.config.tuning, visual);
@@ -135,6 +191,7 @@ export class PracticeDirector {
       spots: this.spots,
     });
     bot.reset();
+    bot.weapon = WEAPONS[this.pickWeapon(ctx.rng)];
     bot.brain = brain;
     brain.start(bot, ctx);
     bot.visual?.setVisible(true);
@@ -169,6 +226,7 @@ export class PracticeDirector {
     const eye = ctx.player.eye();
     const [x, y, z] = this.dmSpawnPoint(ctx, eye, false);
     bot.reset();
+    bot.weapon = WEAPONS[this.pickWeapon(ctx.rng)];
     bot.brain = new DeathmatchBehavior();
     bot.place(x, y, z, ctx.rng() * Math.PI * 2);
     bot.preAimed = false;
@@ -223,6 +281,8 @@ export class PracticeDirector {
     // player respawn
     if (this.playerRespawnAt >= 0 && ctx.time >= this.playerRespawnAt) {
       this.playerRespawnAt = -1;
+      // spawn protection: nobody shoots for a moment after the player is back
+      ctx.graceUntil = ctx.time + (this.mode === 'deathmatch' ? 2 : 1.2);
       if (this.mode === 'deathmatch') {
         const [x, y, z] = this.dmSpawnPoint(ctx, ctx.player.eye(), true);
         // face towards map centre

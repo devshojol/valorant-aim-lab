@@ -60,7 +60,7 @@ import { renderMap, type MapRenderResult } from '../rendering/MapRenderer';
 import { muzzleFlashTexture, radialTexture, setTextureQuality } from '../rendering/textures';
 import { ViewModel } from '../weapons/ViewModel';
 import { damageAt, recoilAt, WEAPONS } from '../weapons/weaponConfigs';
-import { WeaponSystem, type ShotInfo } from '../weapons/WeaponSystem';
+import { BOLT_CYCLE, WeaponSystem, type ShotInfo } from '../weapons/WeaponSystem';
 import { enterGameFullscreen } from '../../utils/fullscreen';
 import { acquireRenderHost, releaseRenderHost, webglAvailable } from './RenderHost';
 
@@ -139,6 +139,7 @@ export class GameEngine {
   private frameMs = 16;
   /** Debug only: game-time multiplier (0 freezes the simulation; see debug.timeScale). */
   private debugTimeScale = 1;
+  private boltAge = -1;
   private hudTimer = 0;
   private visTimer = 0;
   private lastHud: HudState | null = null;
@@ -184,7 +185,7 @@ export class GameEngine {
     this.container = opts.container;
     this.overlay = opts.overlay;
     this.settings = opts.settings;
-    this.config = opts.config;
+    this.config = { ...opts.config }; // own copy: the weapon menu changes primary/secondary mid-session
     const octx = this.overlay.getContext('2d');
     if (!octx) throw new Error('2D canvas unavailable');
     this.overlayCtx = octx;
@@ -426,6 +427,8 @@ export class GameEngine {
       bots: this.director.bots,
       rng: Math.random,
       botFire: (bot, origin, dir) => this.resolveBotShot(bot, origin, dir),
+      mayFire: (bot) => this.director.mayFire(bot, this.time),
+      graceUntil: 0,
       onBotFootstep: (bot) => {
         const occluded = !this.map.world.segmentClear(bot.x, bot.y + 1.5, bot.z, ...this.player.eye());
         this.audio.play('step', { pos: [bot.x, bot.y + 0.1, bot.z], bus: 'foot', volume: 0.9, occluded, rate: 0.94 + Math.random() * 0.12, group: `step-bot-${bot.id}` });
@@ -559,6 +562,39 @@ export class GameEngine {
     this.input.releaseAll();
     this.input.exitLock();
     this.setStatus('paused', { reason });
+  }
+
+  /** The weapons currently in the two slots. */
+  get loadout(): { primary: WeaponId; secondary: WeaponId } {
+    return { primary: this.weapons.slots[0].cfg.id, secondary: this.weapons.slots[1].cfg.id };
+  }
+
+  /**
+   * Swap the weapon in a slot mid-session (weapon menu). Loads the gun's skin first when skins are
+   * on and it hasn't been used yet this session; falls back to the simple model if that fails.
+   */
+  async setWeapon(slot: 0 | 1, id: WeaponId): Promise<void> {
+    if (this.disposed || this.ended || this.status === 'loading') return;
+    if (WEAPONS[id].slot !== (slot === 0 ? 'primary' : 'secondary') || this.weapons.slots[slot].cfg.id === id) return;
+    if (__LOCAL_MODELS__ && this.settings.graphics.gunModels === 'skins' && !this.weaponSkins.has(id)) {
+      try {
+        const m = await import('../weapons/WeaponSkins');
+        const skin = (await m.loadWeaponSkins(this.scene, [id])).get(id);
+        if (this.disposed) {
+          skin?.dispose();
+          return;
+        }
+        if (skin) this.weaponSkins.set(id, skin);
+      } catch (err) {
+        console.warn(`[weapons] ${id} skin unavailable — using the simple model`, err);
+      }
+    }
+    this.viewModel.addWeapon(id, this.weaponSkins.get(id));
+    this.weapons.setSlot(slot, id);
+    if (slot === 0) this.config.primary = id;
+    else this.config.secondary = id;
+    this.lastHud = null;
+    this.emitHud();
   }
 
   /** End the session and return the final statistics. */
@@ -712,6 +748,7 @@ export class GameEngine {
     if (dt <= 0) dt = 1 / 240;
     this.frameMs = this.frameMs * 0.9 + dt * 1000 * 0.1;
     this.fps = 1000 / this.frameMs;
+    if (this.status === 'running' && this.input.consume('loadout')) this.pause('loadout');
     const running = this.status === 'running';
     if (running) this.adaptResolution(dt);
     dt *= this.debugTimeScale; // tests can slow or freeze game time (rendering continues)
@@ -721,7 +758,8 @@ export class GameEngine {
     if (running) {
       // Apply look first for minimum input latency.
       [mdx, mdy] = this.input.takeMouse();
-      if (this.player.alive) this.player.applyLook(mdx, mdy, this.settings.sensitivity, this.weapons.isAds);
+      if (this.player.alive)
+        this.player.applyLook(mdx, mdy, this.settings.sensitivity, this.weapons.isAds, !!this.weapons.weapon.ads.scope, this.weapons.zoom);
       const steps = Math.ceil(dt / SIM_STEP);
       const sdt = steps > 0 ? dt / steps : 0;
       for (let i = 0; i < steps; i++) this.simulate(sdt);
@@ -730,7 +768,8 @@ export class GameEngine {
     }
 
     this.updateCamera();
-    this.viewModel.visible = this.player.alive;
+    // a scoped weapon's own model is hidden once the scope is up (the overlay replaces it)
+    this.viewModel.visible = this.player.alive && !this.scoped;
     this.viewModel.update(dt, this.weapons, this.player.speed, this.player.grounded, mdx, mdy);
     this.effects.update(dt);
     if (this.muzzleLight) this.muzzleLight.intensity = Math.max(0, this.muzzleLight.intensity - dt * 40);
@@ -757,6 +796,7 @@ export class GameEngine {
     this.player.update(dt, this.input);
     this.weapons.update(dt, this.input, this.player);
     this.reloadSounds();
+    this.boltSounds();
     this.director.update(this.ctx, dt, (x, y, z, yaw) => this.respawnPlayer(x, y, z, yaw));
     const sprayDone = this.spray?.update(this.time);
     if (sprayDone) this.tracker.spray(sprayDone);
@@ -770,12 +810,14 @@ export class GameEngine {
   private reloadSounds() {
     if (!this.weapons.reloading) {
       // a reload cut short (weapon switch, death) silences its recording instead of letting it run on
-      if (this.reloadClip && this.lastReloadProgress < 0.95) this.audio.stopGroup('reload');
+      if (this.reloadClip && this.lastReloadProgress < 0.95) this.audio.stopReload();
       this.reloadClip = false;
       return;
     }
     this.lastReloadProgress = this.weapons.reloadProgress;
-    const p = this.viewModel.reloadCueProgress(this.weapons); // cues follow the animation
+    // cues follow the animation: seconds into the reload at which the magazine comes out, goes in, and the bolt moves
+    const cues = this.viewModel.reloadCueTimes(this.weapons);
+    const t = this.weapons.reloadProgress * this.weapons.weapon.reloadTime;
     const c = this.reloadCues;
     // a recorded full reload (public/sounds) replaces the three synthesized cues
     const recorded = [`reload-${this.weapons.weapon.id}`, 'reload'].find((n) => this.audio.isRecorded(n));
@@ -783,22 +825,35 @@ export class GameEngine {
       if (!c.out) {
         c.out = c.in = c.bolt = true;
         this.reloadClip = true;
-        this.audio.play(recorded, { volume: 0.8, group: 'reload' });
+        this.audio.playReload(recorded, cues.out - t, cues.in - t);
       }
       return;
     }
-    if (!c.out && p > 0.08) {
+    if (!c.out && t >= cues.out) {
       c.out = true;
       this.audio.play('mag-out', { volume: 0.6 });
     }
-    if (!c.in && p > 0.6) {
+    if (!c.in && t >= cues.in) {
       c.in = true;
       this.audio.play('mag-in', { volume: 0.7 });
     }
-    if (!c.bolt && p > 0.86 && this.weapons.weapon.slot === 'primary') {
+    if (!c.bolt && cues.bolt !== null && t >= cues.bolt) {
       c.bolt = true;
       this.audio.play('bolt', { volume: 0.6 });
     }
+  }
+
+  /** Bolt action: the bolt is heard opening and closing as it is worked after a shot. */
+  private boltSounds() {
+    const age = this.weapons.boltCycleAge;
+    if (age >= 0) {
+      const k = 1 / (this.weapons.weapon.fireRate * BOLT_CYCLE.per);
+      const open = BOLT_CYCLE.lift * k;
+      const close = (BOLT_CYCLE.forward + 0.1) * k;
+      if (this.boltAge < open && age >= open) this.audio.play('bolt', { volume: 0.55, rate: 0.9 });
+      if (this.boltAge < close && age >= close) this.audio.play('bolt', { volume: 0.65, rate: 1.1 });
+    }
+    this.boltAge = age;
   }
 
   private updateCamera() {
@@ -807,9 +862,48 @@ export class GameEngine {
     const [py, pp] = this.weapons.viewPunch();
     this.camera.rotation.y = this.player.yaw + py * DEG;
     this.camera.rotation.x = -(this.player.pitch + pp * DEG);
-    const w = this.weapons.weapon;
-    const zoom = w.altFire === 'ads' ? 1 + (w.ads.zoom - 1) * this.weapons.ads : 1;
-    this.camera.fov = 2 * Math.atan(Math.tan(BASE_HFOV / 2) / zoom);
+    this.camera.fov = 2 * Math.atan(Math.tan(BASE_HFOV / 2) / this.weapons.zoom);
+  }
+
+  /** True while a sniper scope is fully raised. */
+  private get scoped() {
+    return !!this.weapons.weapon.ads.scope && this.weapons.ads > 0.85 && this.player.alive;
+  }
+
+  /** Sniper scope: black surround, a round lens and thin cross lines. */
+  private drawScope(ctx: CanvasRenderingContext2D, W: number, H: number, cx: number, cy: number, dpr: number) {
+    const r = Math.min(W, H) * 0.46;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.arc(cx, cy, r, 0, Math.PI * 2, true);
+    ctx.fill('evenodd');
+    const g = ctx.createRadialGradient(cx, cy, r * 0.72, cx, cy, r);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.75)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+    ctx.lineWidth = Math.max(1, Math.round(dpr));
+    const gap = 6 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(cx - r, cy);
+    ctx.lineTo(cx - gap, cy);
+    ctx.moveTo(cx + gap, cy);
+    ctx.lineTo(cx + r, cy);
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx, cy - gap);
+    ctx.moveTo(cx, cy + gap);
+    ctx.lineTo(cx, cy + r);
+    ctx.stroke();
+    // centre dot: red when the shot will be accurate, amber while moving or in the air
+    const accurate = this.weapons.lastMovementError < 0.05;
+    ctx.fillStyle = accurate ? 'rgba(255,60,60,0.95)' : 'rgba(255,200,60,0.95)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 1.6 * dpr, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private respawnPlayer(x: number, y: number, z: number, yaw: number) {
@@ -829,9 +923,9 @@ export class GameEngine {
       const done = this.spray.onShot(shot, this.time);
       if (done) this.tracker.spray(done);
     }
-    this.audio.play(weapon.sound, { bus: 'weapons', volume: weapon.sound === 'rifle-suppressed' ? 0.65 : 0.8, rate: 0.97 + Math.random() * 0.06 });
+    this.audio.play(weapon.sound, { bus: 'weapons', volume: weapon.suppressed ? 0.65 : 0.8, rate: 0.97 + Math.random() * 0.06 });
     this.viewModel.onShot();
-    if (this.muzzleLight && weapon.sound !== 'rifle-suppressed') {
+    if (this.muzzleLight && !weapon.suppressed) {
       const m = this.viewModel.muzzleWorld();
       this.muzzleLight.position.set(m[0], m[1], m[2]);
       this.muzzleLight.intensity = 2.2;
@@ -917,7 +1011,7 @@ export class GameEngine {
       pos: muzzle,
       clean: true,
       bus: 'weapons',
-      volume: bot.weapon.sound === 'rifle-suppressed' ? 0.65 : 0.8,
+      volume: bot.weapon.suppressed ? 0.65 : 0.8,
       rate: 0.97 + Math.random() * 0.06,
     });
 
@@ -1008,7 +1102,9 @@ export class GameEngine {
     const cx = Math.floor(W / 2);
     const cy = Math.floor(H / 2);
 
-    if (this.player.alive && this.status !== 'ended') {
+    if (this.scoped && this.status !== 'ended') this.drawScope(ctx, W, H, cx, cy, dpr);
+    else if (this.player.alive && this.status !== 'ended' && !this.weapons.weapon.ads.scope) {
+      // (a scoped weapon has no crosshair from the hip: it is aimed through the scope)
       // convert spread (degrees) to crosshair pixels
       const halfW = W / dpr / 2;
       const k = halfW / Math.tan(this.camera.fov / 2);
@@ -1109,6 +1205,7 @@ export class GameEngine {
       reloading: this.weapons.reloading,
       reloadProgress: Math.round(this.weapons.reloadProgress * 20) / 20,
       ads: this.weapons.isAds,
+      scopeZoom: this.weapons.weapon.ads.scope && this.weapons.isAds ? (this.weapons.scopeLevel === 2 ? (this.weapons.weapon.ads.zoom2 ?? 0) : this.weapons.weapon.ads.zoom) : 0,
       kills: st.kills,
       deaths: st.deaths,
       score: this.tracker.computeScore(),

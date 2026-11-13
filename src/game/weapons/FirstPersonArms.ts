@@ -32,6 +32,7 @@ import {
 } from '../rendering/babylon';
 import type { ArmModel, ArmSideData } from './ArmModel';
 import type { ArmsRigTemplate } from './AnimatedArms';
+import type { PistolRigTemplate } from './PistolArms';
 import { BONE, boneLocalMatrix } from './armBones';
 
 /**
@@ -56,10 +57,12 @@ export class ArmsTemplate {
   /**
    * @param model the skinned glove-arm model (fp-arms.glb), for these posed arms
    * @param rig the animated arms pack (fp-arms-anim.glb), used instead of these arms when present
+   * @param pistolRig the animated pistol arms pack (fp-arms-pistol.glb), used for the sidearms when present
    */
   constructor(
     readonly model: ArmModel | null = null,
     readonly rig: ArmsRigTemplate | null = null,
+    readonly pistolRig: PistolRigTemplate | null = null,
   ) {}
 
   /** Load and skin the arm model (public/models/fp-arms.glb). Rejects if it's missing or unexpected. */
@@ -71,11 +74,22 @@ export class ArmsTemplate {
     throw new Error('the arm model is not part of this build');
   }
 
-  /** Load the animated arms pack (public/models/fp-arms-anim.glb). Rejects if it's missing or unexpected. */
+  /**
+   * Load the animated arms packs: public/models/fp-arms-anim.glb (rifles) and fp-arms-pistol.glb
+   * (sidearms). Rejects if the first is missing or unexpected; without the second, the rifle arms are
+   * posed onto the sidearms as well.
+   */
   static async loadAnimated(scene: Scene): Promise<ArmsTemplate> {
     if (__LOCAL_MODELS__) {
-      const { ArmsRigTemplate } = await import('./AnimatedArms');
-      return new ArmsTemplate(null, await ArmsRigTemplate.load(scene));
+      const [{ ArmsRigTemplate }, { PistolRigTemplate }] = await Promise.all([import('./AnimatedArms'), import('./PistolArms')]);
+      const [rig, pistolRig] = await Promise.all([
+        ArmsRigTemplate.load(scene),
+        PistolRigTemplate.load(scene).catch((err) => {
+          console.warn('[viewmodel] pistol arms unavailable — the rifle arms hold the sidearms', err);
+          return null;
+        }),
+      ]);
+      return new ArmsTemplate(null, rig, pistolRig);
     }
     throw new Error('the animated arms are not part of this build');
   }
@@ -83,6 +97,7 @@ export class ArmsTemplate {
   dispose() {
     this.model?.container.dispose();
     this.rig?.dispose();
+    this.pistolRig?.dispose();
   }
 }
 

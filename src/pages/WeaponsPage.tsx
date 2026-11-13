@@ -3,10 +3,25 @@ import type { WeaponId } from '../types';
 import { store, useAppStore } from '../hooks/useAppStore';
 import { Badge, Button, Card, PageHeader, Slider, cx } from '../components/ui';
 import { SprayPattern } from '../components/Charts';
-import { WEAPONS } from '../game/weapons/weaponConfigs';
+import { ALL_WEAPONS, WEAPONS } from '../game/weapons/weaponConfigs';
 import { RUN_SPEED } from '../game/player/PlayerController';
+import { WeaponIcon } from '../components/WeaponIcon';
 
-const ORDER: WeaponId[] = ['vandal', 'phantom', 'sheriff', 'classic'];
+/** 0..1 ratings for the comparison bars, relative to the strongest gun in each column. */
+function ratings(id: WeaponId) {
+  const w = WEAPONS[id];
+  const near = w.damage[0];
+  const far = w.damage[w.damage.length - 1];
+  return [
+    ['Damage', Math.min(1, near.body / 150)],
+    ['Fire rate', Math.min(1, w.fireRate / 13.33)],
+    ['Range', far.body / near.body],
+    ['Mobility', Math.max(0, Math.min(1, (w.runSpeedMult - 0.9) / 0.14))],
+    ['Magazine', Math.min(1, w.magazine / 30)],
+  ] as [string, number][];
+}
+
+const ORDER: WeaponId[] = ALL_WEAPONS;
 
 export function WeaponsPage() {
   const practice = useAppStore((s) => s.practice);
@@ -42,10 +57,14 @@ export function WeaponsPage() {
                 setSel(id);
                 setBullets(x.magazine);
               }}
-              className={cx('border p-4 text-left transition-colors', id === sel ? 'border-accent bg-accent/10' : 'border-line bg-panel hover:border-mute')}
+              data-active={id === sel}
+              className={cx('tal-tile border p-4 text-left', id === sel ? 'border-accent bg-accent/10' : 'border-line bg-panel hover:border-mute')}
             >
-              <div className="text-xs uppercase tracking-widest text-dim">{x.category}</div>
-              <div className="font-display text-3xl font-bold uppercase" style={{ color: x.color }}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-xs uppercase tracking-widest text-dim">{x.category}</div>
+                <WeaponIcon id={id} className="h-7 w-20 shrink-0 opacity-80" color={id === sel ? x.color : '#5b6776'} />
+              </div>
+              <div className="font-display text-3xl font-bold uppercase leading-tight" style={{ color: x.color }}>
                 {x.name}
               </div>
               <div className="text-xs text-mute">
@@ -57,8 +76,25 @@ export function WeaponsPage() {
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <Card title={`${w.name} profile`} right={equipped ? <Badge tone="ok">Equipped</Badge> : undefined}>
-          <p className="text-sm text-mute">{w.description}</p>
-          <div className="mt-4 grid gap-x-8 gap-y-2 text-sm md:grid-cols-2">
+          <div className="grid items-center gap-6 md:grid-cols-[1fr_260px]">
+            <div>
+              <p className="text-sm text-mute">{w.description}</p>
+              <div className="mt-4 space-y-2">
+                {ratings(sel).map(([label, v]) => (
+                  <div key={label} className="flex items-center gap-3 text-xs">
+                    <span className="w-20 uppercase tracking-widest text-dim">{label}</span>
+                    <div className="h-1.5 flex-1 bg-bg">
+                      <div className="h-full transition-[width] duration-300" style={{ width: `${Math.round(v * 100)}%`, background: w.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="grid place-items-center border border-line bg-bg/50 p-4">
+              <WeaponIcon id={sel} className="h-24 w-full" color={w.color} />
+            </div>
+          </div>
+          <div className="mt-5 grid gap-x-8 gap-y-2 text-sm md:grid-cols-2">
             {[
               ['Fire rate', `${w.fireRate} rounds/s${w.auto ? ' · full-auto' : ' · semi-auto'}`],
               ['Magazine / reserve', `${w.magazine} / ${w.reserve}`],
@@ -68,7 +104,7 @@ export function WeaponsPage() {
               ['Spray spread growth', `+${w.spread.firingPerShot}°/shot (max ${w.spread.firingMax}°)`],
               ['Running inaccuracy', `${w.spread.moveMax}° (accurate below ${(w.spread.accurateSpeedFraction * RUN_SPEED).toFixed(1)} m/s)`],
               ['Airborne inaccuracy', `${w.spread.air}°`],
-              ['Right click', w.altFire === 'ads' ? `Aim down sights (${w.ads.zoom}× zoom)` : `${w.burst?.count}-round burst`],
+              ['Right click', w.altFire === 'ads' ? w.ads.scope ? `Scope: click to cycle ${w.ads.zoom}×${w.ads.zoom2 ? ` → ${w.ads.zoom2}×` : ''} → off` : `Aim down sights (${w.ads.zoom}× zoom)` : `${w.burst?.count}-round burst`],
               ['Recoil recovery', `${w.recoil.recoveryRate} bullets/s after ${w.recoil.recoveryDelay}s`],
               ['View kick', `${Math.round(w.recoil.viewKick * 100)}% of bullet recoil`],
               ['Tracers', w.tracer ? 'Visible' : 'Hidden (suppressed)'],

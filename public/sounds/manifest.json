@@ -1,25 +1,78 @@
 {
-  "vandal": ["vandal-1.wav", "vandal-2.wav", "vandal-3.wav", "vandal-4.wav"],
-  "phantom": ["phantom-1.wav", "phantom-2.wav", "phantom-3.wav"],
-  "classic": [],
+  "vandal": [
+    "vandal-1.wav",
+    "vandal-2.wav",
+    "vandal-3.wav",
+    "vandal-4.wav"
+  ],
+  "phantom": [
+    "phantom-1.wav",
+    "phantom-2.wav",
+    "phantom-3.wav"
+  ],
+  "classic": [
+    "classic-1.wav",
+    "classic-2.wav",
+    "classic-3.wav"
+  ],
   "sheriff": [
     "sheriff-1.wav",
     "sheriff-2.wav",
     "sheriff-3.wav",
     "sheriff-4.wav"
   ],
-  "footstep": ["footstep.mp3"],
-  "reload": ["reload.wav"],
+  "spectre": [
+    "spectre-1.wav",
+    "spectre-2.wav",
+    "spectre-3.wav",
+    "spectre-4.wav"
+  ],
+  "guardian": [
+    "guardian-1.wav",
+    "guardian-2.wav",
+    "guardian-3.wav"
+  ],
+  "operator": [
+    "operator-1.wav",
+    "operator-2.wav",
+    "operator-3.wav"
+  ],
+  "ghost": [
+    "ghost-1.wav",
+    "ghost-2.wav",
+    "ghost-3.wav",
+    "ghost-4.wav"
+  ],
+  "footstep": [
+    "footstep.mp3"
+  ],
+  "reload": [
+    "reload.wav"
+  ],
   "reload-vandal": [],
   "reload-phantom": [],
   "reload-classic": [],
   "reload-sheriff": [],
+  "reload-spectre": [],
+  "reload-guardian": [],
+  "reload-operator": [],
+  "reload-ghost": [],
   "headshot": [],
-  "kill1": ["kill-1.mp3"],
-  "kill2": ["kill-2.mp3"],
-  "kill3": ["kill-3.mp3"],
-  "kill4": ["kill-4.mp3"],
-  "kill5": ["kill-5.mp3"],
+  "kill1": [
+    "kill-1.mp3"
+  ],
+  "kill2": [
+    "kill-2.mp3"
+  ],
+  "kill3": [
+    "kill-3.mp3"
+  ],
+  "kill4": [
+    "kill-4.mp3"
+  ],
+  "kill5": [
+    "kill-5.mp3"
+  ],
   "vandal-kill1": [],
   "vandal-kill2": [],
   "vandal-kill3": [],

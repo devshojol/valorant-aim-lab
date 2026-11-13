@@ -11,13 +11,15 @@
  *
  * Clips are evaluated directly (goToFrame) from game state each frame: Draw follows the equip timer,
  * Reload follows the reload, Fire restarts on every shot, and the first Fire frame is the idle pose.
- * There are no pistol clips: with a pistol the right arm keeps the rifle grip pose and the left arm
- * is solved with two-bone IK to cup the right hand.
+ * There are no pistol clips: with a pistol the whole rig is moved so the idle right-hand hold lands on
+ * the pistol's grip, and the left arm is placed to cup the right hand (or to follow the pistol reload).
  */
 import type { AssetContainer, InstantiatedEntries } from '@babylonjs/core/assetContainer';
 import type { AnimationGroup } from '@babylonjs/core/Animations/animationGroup';
 import { Matrix, Quaternion, TransformNode, Vector3, type AbstractMesh, type Scene } from '../rendering/babylon';
 import { loadContainer } from '../rendering/gltf';
+import { PISTOL_HOLD_FWD, PISTOL_HOLD_UP } from './holds';
+import { RELOAD_ANIM_SHARE } from './WeaponSystem';
 
 const ARMS_ANIM_URL = 'models/fp-arms-anim.glb';
 
@@ -61,21 +63,42 @@ interface Framing {
   offset: Vector3;
 }
 const FRAMING: Framing = { pitch: 9 * DEG, yaw: 7 * DEG, offset: new Vector3(0.02, -0.01, 0.04) };
-/** Fire clip playback speed, and the fastest the reload clip may be squeezed. */
+/**
+ * Where the left hand's curled fingers close, measured from the wrist joint in the idle pose (metres):
+ * along the hand towards the knuckles, and out from the palm. What the hand holds goes there.
+ */
+const LEFT_CURL = { along: 0.115, palm: 0.045 };
+/** Pistols: where the left elbow is, seen from the wrist (view space). */
+const LEFT_FOREARM_FROM = new Vector3(-0.55, -0.4, -0.75);
+/** A reach of the right hand: where the right elbow is, seen from the wrist (view space). */
+const RIGHT_FOREARM_FROM = new Vector3(0.3, -0.7, -0.65);
+/** Fire clip playback speed, and how far the reload clip may be squeezed or stretched to last the whole reload. */
 const FIRE_SPEED = 1.15;
 const MAX_RELOAD_SPEED = 2.2;
+const MIN_RELOAD_SPEED = 0.7;
 
 type ClipName = 'draw' | 'fire' | 'reload' | 'reloadEmpty';
 const CLIP_NAMES: Record<ClipName, string> = { draw: 'Draw', fire: 'Fire', reload: 'Reload', reloadEmpty: 'Reload_Empty' };
 /**
  * Where each clip sits on the pack's shared timeline (seconds). The loader pads every channel back to
  * frame 0, so the authored ranges can't be read from the keys.
+ *
+ * The reload clips are cut where the hands are back on the gun: the pack holds the idle pose for the
+ * rest of each one (to 3.6667 and 7.5), which would leave the gun looking ready while it still can't fire.
  */
 const CLIP_RANGE: Record<ClipName, [number, number]> = {
-  reload: [0.0333, 3.6667],
-  reloadEmpty: [3.7, 7.5],
+  reload: [0.0333, 2.9333],
+  reloadEmpty: [3.7, 7.05],
   fire: [7.5333, 8.3333],
   draw: [8.9667, 10.0],
+};
+/**
+ * Moments in the reload clips (seconds from the clip's start): the magazine leaves the gun, the new
+ * one is seated, and the left hand's last action (a tap on the magazine, or the bolt release when empty).
+ */
+const RELOAD_EVENTS: Record<'reload' | 'reloadEmpty', { out: number; in: number; bolt: number }> = {
+  reload: { out: 0.9, in: 2.05, bolt: 2.4 },
+  reloadEmpty: { out: 0.95, in: 2.05, bolt: 2.55 },
 };
 
 interface Clip {
@@ -120,6 +143,8 @@ export interface RigGun {
   supportLocal: Vector3 | null;
   pistol: boolean;
   mag: TransformNode | null;
+  /** Bottom of the grip, under the grip point (pistols: the left hand goes under it). */
+  gripBottom?: Vector3 | null;
 }
 
 export interface RigState {
@@ -136,6 +161,17 @@ export interface RigState {
   /** Extra offset in holder space (sway, bob, kick, pistol reload dip). */
   offsetPos: Vector3;
   offsetRot: Vector3;
+  /**
+   * Pistols: where the left hand's grasp is, as offsets from its hold under the grip (metres): one along the
+   * gun's axes, one along the view's. The pistol reload moves it off the gun to fetch a magazine and
+   * back; absent = cupping the grip.
+   */
+  leftOffset?: { gun: Vector3; view: Vector3 } | null;
+  /**
+   * Rifles: the trigger hand leaves the grip for a point on the gun (gun-root space), e.g. a bolt handle.
+   * `blend` 0 = on the grip, 1 = its grasp is at `to`.
+   */
+  rightReach?: { to: Vector3; blend: number } | null;
 }
 
 interface GunCache {
@@ -175,10 +211,12 @@ export class AnimatedArms {
   /** Left-hand axes in its own space: towards the middle knuckle, and from little finger to index. */
   private readonly lFingers: Vector3;
   private readonly lSide: Vector3;
+  /** The left upper arm's own position (the pistol hold moves it; the clips don't put it back). */
+  private readonly lArmRest: Vector3;
   private readonly rFingers: Vector3;
   private readonly rSide: Vector3;
-  /** Right-hand joint relative to the M4 grip frame in the idle pose. */
-  private readonly rightHold: Matrix;
+  /** Right-arm joints as the clip left them, while a reach has them moved. */
+  private rSaved: { n: TransformNode; p: Vector3; q: Quaternion }[] | null = null;
 
   constructor(
     template: ArmsRigTemplate,
@@ -247,9 +285,8 @@ export class AnimatedArms {
       return [loc(middle).normalize(), loc(index).subtract(loc(pinky)).normalize()];
     };
     [this.lFingers, this.lSide] = axes(this.j.lHand, this.j.lMiddle, this.j.lIndex, this.j.lPinky);
+    this.lArmRest = this.j.lArm.position.clone();
     [this.rFingers, this.rSide] = axes(this.j.rHand, this.j.rMiddle, this.j.rIndex, this.j.rPinky);
-    // the idle right-hand hold relative to the M4's grip frame (reused on pistols)
-    this.rightHold = this.j.rHand.getWorldMatrix().multiply(this.m4GripFrame().invert());
   }
 
   /**
@@ -277,11 +314,20 @@ export class AnimatedArms {
     this.fireT = 0;
   }
 
-  /** How long the reload clip takes for a reload of `reloadTime` seconds (faster than authored, never frantic). */
+  /** How long the reload clip takes for a reload of `reloadTime` seconds: the whole reload, within the playback speed limits. */
   reloadClipSeconds(reloadTime: number, empty: boolean): number {
     const c = this.clips[empty ? 'reloadEmpty' : 'reload'];
     const len = (c.to - c.from) / c.fps;
-    return Math.min(len, Math.max(len / MAX_RELOAD_SPEED, reloadTime * 0.8));
+    return Math.min(len / MIN_RELOAD_SPEED, Math.max(len / MAX_RELOAD_SPEED, reloadTime * RELOAD_ANIM_SHARE));
+  }
+
+  /** When the reload clip's sound cues fall, in seconds from the start of a reload of `reloadTime` seconds. */
+  reloadCueTimes(reloadTime: number, empty: boolean): { out: number; in: number; bolt: number } {
+    const name = empty ? 'reloadEmpty' : 'reload';
+    const c = this.clips[name];
+    const k = this.reloadClipSeconds(reloadTime, empty) / ((c.to - c.from) / c.fps);
+    const e = RELOAD_EVENTS[name];
+    return { out: e.out * k, in: e.in * k, bolt: e.bolt * k };
   }
 
   dispose() {
@@ -294,13 +340,21 @@ export class AnimatedArms {
 
   update(dt: number, gun: RigGun, s: RigState) {
     if (!this.framed) this.applyFraming();
+    this.j.lArm.position.copyFrom(this.lArmRest);
+    if (this.rSaved) {
+      for (const r of this.rSaved) {
+        r.n.position.copyFrom(r.p);
+        r.n.rotationQuaternion!.copyFrom(r.q);
+      }
+      this.rSaved = null;
+    }
     if (gun.pistol) {
-      // no pistol clips: the game places the pistol itself; both arms are solved onto it from the idle pose
+      // no pistol clips: the game places the pistol itself and the arms go to it
       this.anchor.position.setAll(0);
       this.anchor.rotationQuaternion!.copyFromFloats(0, 0, 0, 1);
       this.show('fire', this.clips.fire.from);
       this.refresh();
-      this.holdPistol(gun);
+      this.holdPistol(gun, s.leftOffset ?? null);
       return;
     }
     const cache = this.cacheFor(gun);
@@ -340,6 +394,34 @@ export class AnimatedArms {
 
     // 4. magazine follows whichever pack magazine is nearer the gun
     if (gun.mag && cache.magRest) this.placeMag(gun, cache.magRest);
+
+    // 5. the trigger hand reaches for something on the gun
+    if (s.rightReach && s.rightReach.blend > 0.001) this.reachRight(gun, s.rightReach.to, s.rightReach.blend);
+  }
+
+  /**
+   * Carry the right hand's grasp from the grip towards `to` (gun-root space). The hand keeps the attitude
+   * it has on the grip; the arm is re-solved to its new place. The gun stays where it is (it rides the
+   * weapon joint, not the hand).
+   */
+  private reachRight(gun: RigGun, to: Vector3, blend: number) {
+    const { rArm, rFore, rHand } = this.j;
+    this.rSaved = [rArm, rFore, rHand].map((n) => ({ n, p: n.position.clone(), q: n.rotationQuaternion!.clone() }));
+    const G = gun.root.getWorldMatrix();
+    const move = Vector3.TransformCoordinates(to, G).subtractInPlace(Vector3.TransformCoordinates(gun.gripLocal, G)).scaleInPlace(blend);
+    const W = rHand.getWorldMatrix();
+    const fingers = Vector3.TransformNormal(this.rFingers, W).normalize();
+    const side = Vector3.TransformNormal(this.rSide, W).normalize();
+    const wrist = rHand.getAbsolutePosition().add(move);
+    // the forearm comes up from below-right of the view (not in from the side, close to the eye), so the
+    // raised arm stays small on screen and its cut-off end out of view
+    const elbowNow = rFore.getAbsolutePosition();
+    const handNow = rHand.getAbsolutePosition();
+    const fore = Vector3.Distance(elbowNow, handNow);
+    const from = Vector3.TransformNormal(RIGHT_FOREARM_FROM, (this.anchor.parent as TransformNode).getWorldMatrix()).normalize();
+    const dir = Vector3.Lerp(elbowNow.subtract(handNow).normalize(), from, blend).normalize();
+    const elbow = wrist.add(dir.scaleInPlace(fore));
+    this.solveArm(rArm, rFore, rHand, wrist, this.rFingers, this.rSide, fingers, side, elbow);
   }
 
   private show(name: ClipName, frame: number) {
@@ -484,9 +566,20 @@ export class AnimatedArms {
   /**
    * Two-bone IK: bend `upper`/`fore` so the `hand` joint reaches `target` (the elbow keeps the side the
    * animation gave it), then turn the hand so its `fingers` axis points along `wantFingers` and its
-   * `side` axis (towards the index finger) as close to `wantSide` as possible.
+   * `side` axis (towards the index finger) as close to `wantSide` as possible. With `elbow`, the elbow
+   * is put exactly there instead (it must be a forearm's length from `target`).
    */
-  private solveArm(upper: TransformNode, fore: TransformNode, hand: TransformNode, target: Vector3, fingers: Vector3, side: Vector3, wantFingers: Vector3, wantSide: Vector3) {
+  private solveArm(
+    upper: TransformNode,
+    fore: TransformNode,
+    hand: TransformNode,
+    target: Vector3,
+    fingers: Vector3,
+    side: Vector3,
+    wantFingers: Vector3,
+    wantSide: Vector3,
+    elbow: Vector3 | null = null,
+  ) {
     const A = upper.getAbsolutePosition().clone();
     const B = fore.getAbsolutePosition().clone();
     const C = hand.getAbsolutePosition().clone();
@@ -501,14 +594,24 @@ export class AnimatedArms {
     if (nrm.lengthSquared() < 1e-8) nrm.set(0, -1, 0);
     nrm.normalize();
     const cosA = Math.min(1, Math.max(-1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d)));
-    const E = A.add(u.scale(l1 * cosA)).addInPlace(nrm.scale(l1 * Math.sqrt(1 - cosA * cosA)));
     const q = new Quaternion();
-    Quaternion.FromUnitVectorsToRef(B.subtract(A).normalize(), E.subtract(A).normalize(), q);
-    this.rotateWorld(upper, q);
+    if (elbow) {
+      // the elbow is given: carry the whole arm there (the upper arm has no visible mesh)
+      Matrix.TranslationToRef(elbow.x - B.x, elbow.y - B.y, elbow.z - B.z, tT);
+      upper.getWorldMatrix().multiplyToRef(tT, tA);
+      (upper.parent as TransformNode).getWorldMatrix().invertToRef(tI);
+      tA.multiplyToRef(tI, tB);
+      tB.decompose(tS, tQ, tP);
+      upper.position.copyFrom(tP);
+    } else {
+      const E = A.add(u.scale(l1 * cosA)).addInPlace(nrm.scale(l1 * Math.sqrt(1 - cosA * cosA)));
+      Quaternion.FromUnitVectorsToRef(B.subtract(A).normalize(), E.subtract(A).normalize(), q);
+      this.rotateWorld(upper, q);
+    }
     this.refreshFrom(upper);
     const B2 = fore.getAbsolutePosition().clone();
     const C2 = hand.getAbsolutePosition().clone();
-    Quaternion.FromUnitVectorsToRef(C2.subtract(B2).normalize(), A.add(u.scale(d)).subtract(B2).normalize(), q);
+    Quaternion.FromUnitVectorsToRef(C2.subtract(B2).normalize(), (elbow ? target : A.add(u.scale(d))).subtract(B2).normalize(), q);
     this.rotateWorld(fore, q);
     this.refreshFrom(fore);
 
@@ -528,35 +631,46 @@ export class AnimatedArms {
   }
 
   /**
-   * Pistol: the right hand takes the same hold on the pistol's grip that the pack's idle pose has on the
-   * M4's grip; the left hand cups it from below-left, fingers wrapped round the right hand.
+   * Pistol: the whole rig is moved so that the idle pose's hold on the M4's grip lands on the pistol's
+   * grip (a pistol is held further out than the rifle the poses were made for; reaching for it from
+   * the rifle position leaves both hands short of the gun). The right arm then needs no solving and
+   * follows the gun rigidly; the left hand goes under the bottom of the grip, palm up.
    */
-  private holdPistol(gun: RigGun) {
+  private holdPistol(gun: RigGun, leftOffset: { gun: Vector3; view: Vector3 } | null) {
     const G = gun.root.computeWorldMatrix(true);
     const right = Vector3.TransformNormal(Vector3.Right(), G).normalize();
     const up = Vector3.TransformNormal(Vector3.Up(), G).normalize();
     const fwd = Vector3.TransformNormal(Vector3.Forward(), G).normalize();
-    const grip = Vector3.TransformCoordinates(gun.gripLocal, G);
+    // carry the hold up onto the short grip (see holds.ts)
+    const grip = Vector3.TransformCoordinates(gun.gripLocal, G).addInPlace(up.scale(PISTOL_HOLD_UP)).addInPlace(fwd.scale(PISTOL_HOLD_FWD));
     const gripFrame = Matrix.FromValues(right.x, right.y, right.z, 0, up.x, up.y, up.z, 0, fwd.x, fwd.y, fwd.z, 0, grip.x, grip.y, grip.z, 1);
 
-    // right hand: the idle hold, carried from the M4's grip frame to the pistol's
-    const target = this.rightHold.multiply(gripFrame);
-    const { rArm, rFore, rHand, lArm, lFore, lHand } = this.j;
-    this.solveArm(
-      rArm,
-      rFore,
-      rHand,
-      target.getTranslation(),
-      this.rFingers,
-      this.rSide,
-      Vector3.TransformNormal(this.rFingers, target),
-      Vector3.TransformNormal(this.rSide, target),
-    );
+    // anchor' = anchor · inv(M4 grip frame) · pistol grip frame, expressed in the holder's space
+    const A0 = this.anchor.getWorldMatrix();
+    const A1 = A0.multiply(this.m4GripFrame().invert()).multiply(gripFrame);
+    A1.multiply(A0.clone().invert()).decompose(tS, this.anchor.rotationQuaternion!, this.anchor.position);
+    this.refresh();
+    const { lArm, lFore, lHand } = this.j;
 
-    // left hand: wrist below-left of the grip, fingers wrapping forward-right round the right hand, index side up
-    const wantFingers = fwd.scale(0.55).addInPlace(right.scale(0.7)).addInPlace(up.scale(-0.15)).normalize();
-    const palm = grip.add(right.scale(-0.04)).addInPlace(up.scale(-0.04)).addInPlace(fwd.scale(0.005));
-    const wrist = palm.subtract(wantFingers.scale(0.06));
-    this.solveArm(lArm, lFore, lHand, wrist, this.lFingers, this.lSide, wantFingers, up.scale(0.7).addInPlace(fwd.scale(0.6)));
+    // left hand: cupped under the bottom of the grip. It comes in from behind-left with the palm turned
+    // up and in towards the grip, so the grip stands on the heel of the hand, the thumb lies up its left
+    // side and the curled fingers come up round the front over the right hand's. The centre of that curl
+    // goes a little above the bottom of the grip.
+    const wantFingers = fwd.scale(0.75).addInPlace(right.scale(0.6)).addInPlace(up.scale(0.15)).normalize();
+    const facing = up.scale(0.8).addInPlace(right.scale(0.6));
+    const palmDir = facing.subtract(wantFingers.scale(Vector3.Dot(facing, wantFingers))).normalize();
+    const wantSide = Vector3.Cross(wantFingers, palmDir); // a left hand's palm faces −(fingers × index side)
+    const bottom = gun.gripBottom ? Vector3.TransformCoordinates(gun.gripBottom, G) : Vector3.TransformCoordinates(gun.gripLocal, G).addInPlace(up.scale(-0.045));
+    const curl = bottom.add(up.scale(LEFT_CURL.palm + 0.005)).addInPlace(right.scale(0.012));
+    if (leftOffset) {
+      const o = leftOffset.gun;
+      curl.addInPlace(right.scale(o.x)).addInPlace(up.scale(o.y)).addInPlace(fwd.scale(o.z));
+      curl.addInPlace(Vector3.TransformNormal(leftOffset.view, (this.anchor.parent as TransformNode).getWorldMatrix()));
+    }
+    const wrist = curl.subtract(wantFingers.scale(LEFT_CURL.along)).subtractInPlace(palmDir.scale(LEFT_CURL.palm));
+    // the forearm comes up from below-left of the view, so its cut-off end stays off screen
+    const fore = Vector3.Distance(lFore.getAbsolutePosition(), lHand.getAbsolutePosition());
+    const elbow = wrist.add(Vector3.TransformNormal(LEFT_FOREARM_FROM, (this.anchor.parent as TransformNode).getWorldMatrix()).normalize().scale(fore));
+    this.solveArm(lArm, lFore, lHand, wrist, this.lFingers, this.lSide, wantFingers, wantSide, elbow);
   }
 }

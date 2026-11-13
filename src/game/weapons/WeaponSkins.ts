@@ -2,6 +2,8 @@
  * Optional weapon skins: GLB models in public/models/weapons that replace the blocky
  * first-person guns (and the bots' rifle).
  *
+ * On sidearms the grip point is the middle of the grip (the hold is raised onto it in AnimatedArms).
+ *
  * Each model is described by a few points measured on it (after `yaw` turns the barrel to +Z,
  * with +Y up and the model centred on X): the trigger-hand grip, the support-hand handguard,
  * the muzzle and the top of the sight line. The game scales the model to a target length and
@@ -22,6 +24,8 @@ export interface SkinSpec {
   yaw: number;
   /** Model length along the barrel (stock to muzzle), in model units. */
   length: number;
+  /** Length the gun is drawn at in first person, in metres (default: 0.92 for primaries, 0.34 for sidearms). */
+  viewLength?: number;
   grip: YZ;
   handguard: YZ | null;
   muzzle: YZ;
@@ -29,6 +33,9 @@ export interface SkinSpec {
   sightY: number;
   /** Node holding the detachable magazine (drops out on reload). */
   magNode?: string;
+  /** Bolt node (bolt action) and a point on the axis it turns about and slides along. */
+  boltNode?: string;
+  boltAxis?: YZ;
   /** Revolver cylinder node: turns around its local Z axis after each shot. */
   cylinderNode?: string;
   /** Turn per shot = full circle / chambers. */
@@ -55,18 +62,72 @@ const SKIN_SPECS: Partial<Record<WeaponId, SkinSpec>> = {
     muzzle: [0.075, 0.5],
     sightY: 0.115,
   },
+  // The six below were prepared with scripts/prepare-weapon-skin.mjs: barrel along +Z, centred,
+  // in metres, so `yaw` is 0 and the points are read straight off a side view.
   sheriff: {
     file: 'models/weapons/sheriff.glb',
-    yaw: Math.PI / 2,
-    length: 0.427,
-    grip: [-0.025, -0.15],
+    yaw: 0,
+    length: 0.34,
+    grip: [-0.03, -0.125],
     handguard: null,
-    muzzle: [0.06, 0.205],
-    sightY: 0.105,
-    cylinderNode: 'Mag_Rotator_15',
-    // This rig turns the whole front assembly (cylinder cage, barrel and top sight) together, so a
-    // one-chamber step would leave the sight off-centre: spin a full turn per shot instead.
-    chambers: 1,
+    muzzle: [0.05, 0.17],
+    sightY: 0.085,
+  },
+  spectre: {
+    file: 'models/weapons/spectre.glb',
+    yaw: 0,
+    length: 0.66,
+    viewLength: 0.68,
+    grip: [-0.028, -0.16],
+    handguard: [0.035, 0.12],
+    muzzle: [0.077, 0.33],
+    sightY: 0.1,
+  },
+  guardian: {
+    file: 'models/weapons/guardian.glb',
+    yaw: 0,
+    length: 1.15,
+    viewLength: 1.1,
+    grip: [-0.03, -0.28],
+    handguard: [0.03, 0.12],
+    muzzle: [0.088, 0.565],
+    sightY: 0.115,
+  },
+  operator: {
+    file: 'models/weapons/operator.glb',
+    yaw: 0,
+    length: 1.25,
+    // close to life size: it is the longest gun in the game and should look it next to the rifles
+    viewLength: 1.2,
+    // middle of the pistol grip (its top is at y −0.02, its heel at −0.105)
+    grip: [-0.06, -0.315],
+    // the fore-end just ahead of the magazine
+    handguard: [0.02, 0.03],
+    muzzle: [0.06, 0.62],
+    sightY: 0.125,
+    magNode: 'mag',
+    boltNode: 'bolt',
+    boltAxis: [0.057, -0.193],
+  },
+  ghost: {
+    file: 'models/weapons/ghost.glb',
+    yaw: 0,
+    length: 0.4,
+    viewLength: 0.55,
+    grip: [-0.025, -0.162],
+    handguard: null,
+    muzzle: [0.051, 0.2],
+    sightY: 0.066,
+  },
+  classic: {
+    file: 'models/weapons/classic.glb',
+    yaw: 0,
+    length: 0.21,
+    viewLength: 0.31,
+    grip: [-0.025, -0.07],
+    handguard: null,
+    muzzle: [0.05, 0.105],
+    sightY: 0.07,
   },
 };
 
@@ -80,6 +141,8 @@ export interface PlacedSkin {
   sightY: number;
   mag: TransformNode | null;
   cylinder: TransformNode | null;
+  bolt: TransformNode | null;
+  boltAxis: Vector3 | null;
   dispose(): void;
 }
 
@@ -114,6 +177,8 @@ export class WeaponSkin {
       sightY: holder.position.y + spec.sightY * s,
       mag: find(spec.magNode),
       cylinder: find(spec.cylinderNode),
+      bolt: find(spec.boltNode),
+      boltAxis: spec.boltAxis ? at(spec.boltAxis) : null,
       dispose() {
         holder.dispose(false, false); // materials belong to the shared template
         for (const k of skeletons) k.dispose();

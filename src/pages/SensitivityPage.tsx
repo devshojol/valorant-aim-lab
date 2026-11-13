@@ -93,7 +93,7 @@ export function SensitivityPage() {
               <Slider label="Horizontal multiplier" value={s.horizontalMult} min={0.1} max={3} step={0.01} onChange={(v) => set({ horizontalMult: v })} />
               <Slider label="Vertical multiplier" value={s.verticalMult} min={0.1} max={3} step={0.01} onChange={(v) => set({ verticalMult: v })} />
               <Slider label="ADS sensitivity multiplier" value={s.adsMult} min={0.1} max={3} step={0.01} onChange={(v) => set({ adsMult: v })} hint="Applied while aiming down sights" />
-              <Slider label="Scoped sensitivity multiplier" value={s.scopedMult} min={0.1} max={3} step={0.01} onChange={(v) => set({ scopedMult: v })} hint="Reserved for sniper scopes (Operator/Marshal not in the MVP)" />
+              <Slider label="Scoped sensitivity multiplier" value={s.scopedMult} min={0.1} max={3} step={0.01} onChange={(v) => set({ scopedMult: v })} hint="Applies while the Operator's scope is up. At 1 the picture moves across the screen as fast as unscoped, at both zoom levels" />
             </div>
             <div className="grid gap-x-6 md:grid-cols-2">
               <Toggle label="Invert Y axis" checked={s.invertY} onChange={(v) => set({ invertY: v })} />

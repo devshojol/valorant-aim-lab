@@ -1,6 +1,7 @@
 import { Heart, Shield, Skull } from 'lucide-react';
 import type { HudSettings, HudState, KillFeedEntry } from '../../types';
 import { cx } from '../ui';
+import { WeaponIcon } from '../WeaponIcon';
 
 function Bar({ value, max, color }: { value: number; max: number; color: string }) {
   return (
@@ -42,7 +43,7 @@ export function Hud({ hud, flags, feed, renderer }: { hud: HudState; flags: HudS
           </div>
         )}
         {flags.showTimer && (
-          <div className="flex min-w-28 flex-col items-center justify-center bg-black/60 px-5 py-1">
+          <div className="flex min-w-28 flex-col items-center justify-center border-b-2 border-accent bg-black/60 px-5 py-1">
             <div className="font-display text-3xl font-bold leading-none tabular">
               {hud.timeLeft >= 0
                 ? `${Math.floor(hud.timeLeft / 60)}:${String(hud.timeLeft % 60).padStart(2, '0')}`
@@ -93,7 +94,7 @@ export function Hud({ hud, flags, feed, renderer }: { hud: HudState; flags: HudS
 
       {/* bottom-left: health */}
       {flags.showHealth && (
-        <div className="absolute bottom-5 left-5 flex items-end gap-4 bg-black/45 px-4 py-3">
+        <div className="absolute bottom-5 left-5 flex items-end gap-4 border-l-2 border-accent bg-gradient-to-r from-black/60 to-black/25 px-4 py-3">
           <div>
             <div className="flex items-center gap-2">
               <Heart size={16} className={low ? 'text-accent' : 'text-white/80'} />
@@ -117,8 +118,11 @@ export function Hud({ hud, flags, feed, renderer }: { hud: HudState; flags: HudS
 
       {/* bottom-right: weapon + ammo */}
       {flags.showAmmo && (
-        <div className="absolute bottom-5 right-5 min-w-48 bg-black/45 px-4 py-3 text-right">
-          <div className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-white/70">{hud.weaponName}</div>
+        <div className="absolute bottom-5 right-5 min-w-52 border-r-2 border-accent bg-gradient-to-l from-black/60 to-black/25 px-4 py-3 text-right">
+          <div className="flex items-center justify-end gap-3">
+            <WeaponIcon id={hud.weaponId} className="h-6 w-[72px] opacity-80" color="#ece8e1" />
+            <div className="font-display text-sm font-semibold uppercase tracking-[0.2em] text-white/70">{hud.weaponName}</div>
+          </div>
           <div className="flex items-baseline justify-end gap-2">
             <span className={cx('font-display text-5xl font-bold leading-none tabular', hud.ammo === 0 && 'text-accent')}>{hud.ammo}</span>
             <span className="font-display text-xl text-white/55 tabular">/ {hud.reserve < 0 ? '∞' : hud.reserve}</span>
@@ -131,7 +135,7 @@ export function Hud({ hud, flags, feed, renderer }: { hud: HudState; flags: HudS
               </div>
             </div>
           )}
-          {hud.ads && <div className="mt-1 text-[10px] uppercase tracking-widest text-info">ADS</div>}
+          {hud.ads && <div className="mt-1 text-[10px] uppercase tracking-widest text-info">{hud.scopeZoom ? `Scoped ${hud.scopeZoom}×` : 'ADS'}</div>}
         </div>
       )}
 

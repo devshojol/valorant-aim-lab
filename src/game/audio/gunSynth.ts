@@ -15,7 +15,7 @@
  * All of it is generated from noise and oscillators, so no recorded or copyrighted audio is used.
  */
 
-export type GunSoundId = 'rifle-heavy' | 'rifle-suppressed' | 'pistol-light' | 'pistol-heavy';
+export type GunSoundId = 'rifle-heavy' | 'rifle-suppressed' | 'rifle-dmr' | 'smg-suppressed' | 'sniper' | 'pistol-light' | 'pistol-heavy' | 'pistol-suppressed';
 
 interface MechEvent {
   delay: number;
@@ -114,6 +114,80 @@ const GUN_PROFILES: Record<GunSoundId, GunProfile> = {
     ],
     reverb: { wet: 0.6, seconds: 2.1, decay: 0.52, damp: 4600 },
     peak: 0.98,
+  },
+  // Guardian — marksman rifle: sharper and drier than the Vandal, one heavy action clack per shot.
+  'rifle-dmr': {
+    length: 1.8,
+    crack: { gain: 1.1, hp: 2500, width: 0.0005, decay: 0.006 },
+    blast: { gain: 1.4, bp: 1250, q: 0.6, decay: 0.026, sweepFrom: 10500, sweepTo: 1250, sweepTime: 0.09 },
+    body: { gain: 1.15, lp: 460, decay: 0.05 },
+    sub: { gain: 0.5, f0: 120, f1: 58, decay: 0.04 },
+    mech: [{ delay: 0.07, gain: 0.2, freqs: [1350, 2080, 3150, 4520, 6100], decay: 0.018 }],
+    drive: 2.5,
+    reflections: [
+      { gain: 0.26, left: 0.031, right: 0.038, lp: 3500 },
+      { gain: 0.18, left: 0.066, right: 0.057, lp: 2500 },
+      { gain: 0.12, left: 0.108, right: 0.121, lp: 1700 },
+      { gain: 0.07, left: 0.168, right: 0.155, lp: 1250 },
+    ],
+    reverb: { wet: 0.6, seconds: 1.8, decay: 0.45, damp: 5000 },
+    peak: 0.97,
+  },
+  // Spectre — suppressed SMG: short dry tick with a fast, light bolt; almost no tail so it stays clean at 13 shots a second.
+  'smg-suppressed': {
+    length: 0.8,
+    crack: { gain: 0.2, hp: 3600, width: 0.00035, decay: 0.0025 },
+    blast: { gain: 0.62, bp: 820, q: 1.0, decay: 0.012, sweepFrom: 3000, sweepTo: 760, sweepTime: 0.035 },
+    body: { gain: 0.6, lp: 360, decay: 0.03 },
+    sub: { gain: 0.25, f0: 150, f1: 80, decay: 0.02 },
+    hiss: { gain: 0.34, bp: 3100, decay: 0.02 },
+    mech: [
+      { delay: 0.007, gain: 0.42, freqs: [2480, 3720, 5260, 7050, 9100], decay: 0.009 },
+      { delay: 0.034, gain: 0.26, freqs: [2150, 3380, 4960, 6420], decay: 0.011 },
+    ],
+    drive: 1.4,
+    reflections: [
+      { gain: 0.16, left: 0.025, right: 0.031, lp: 2300 },
+      { gain: 0.09, left: 0.052, right: 0.046, lp: 1700 },
+    ],
+    reverb: { wet: 0.14, seconds: 0.8, decay: 0.18, damp: 3600 },
+    peak: 0.72,
+  },
+  // Operator — sniper: the loudest shot, very deep, with a long rolling echo and a late bolt.
+  sniper: {
+    length: 2.8,
+    crack: { gain: 1.25, hp: 1700, width: 0.0008, decay: 0.01 },
+    blast: { gain: 1.7, bp: 760, q: 0.45, decay: 0.04, sweepFrom: 9000, sweepTo: 700, sweepTime: 0.15 },
+    body: { gain: 1.6, lp: 300, decay: 0.085 },
+    sub: { gain: 0.8, f0: 90, f1: 38, decay: 0.07 },
+    mech: [{ delay: 0.12, gain: 0.1, freqs: [980, 1620, 2440, 3380], decay: 0.03 }],
+    drive: 3.0,
+    reflections: [
+      { gain: 0.34, left: 0.036, right: 0.045, lp: 3000 },
+      { gain: 0.25, left: 0.079, right: 0.069, lp: 2200 },
+      { gain: 0.18, left: 0.131, right: 0.146, lp: 1500 },
+      { gain: 0.12, left: 0.214, right: 0.198, lp: 1050 },
+      { gain: 0.07, left: 0.33, right: 0.305, lp: 800 },
+    ],
+    reverb: { wet: 0.7, seconds: 2.7, decay: 0.68, damp: 4200 },
+    peak: 0.99,
+  },
+  // Ghost — suppressed pistol: a small bright snap, slide click, no tail.
+  'pistol-suppressed': {
+    length: 0.8,
+    crack: { gain: 0.18, hp: 3800, width: 0.0003, decay: 0.0025 },
+    blast: { gain: 0.6, bp: 1100, q: 1.0, decay: 0.011, sweepFrom: 3600, sweepTo: 1000, sweepTime: 0.035 },
+    body: { gain: 0.5, lp: 480, decay: 0.028 },
+    sub: { gain: 0.2, f0: 170, f1: 90, decay: 0.018 },
+    hiss: { gain: 0.3, bp: 3400, decay: 0.022 },
+    mech: [{ delay: 0.009, gain: 0.34, freqs: [2900, 4250, 5880, 7900], decay: 0.008 }],
+    drive: 1.3,
+    reflections: [
+      { gain: 0.15, left: 0.026, right: 0.032, lp: 2400 },
+      { gain: 0.08, left: 0.055, right: 0.048, lp: 1800 },
+    ],
+    reverb: { wet: 0.14, seconds: 0.8, decay: 0.2, damp: 3800 },
+    peak: 0.68,
   },
 };
 

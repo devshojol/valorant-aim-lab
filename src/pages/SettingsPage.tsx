@@ -18,6 +18,7 @@ const KEYS: [string, string][] = [
   ['Space', 'Jump'],
   ['1 / 2', 'Primary / sidearm'],
   ['Mouse wheel', 'Swap weapon'],
+  ['B', 'Weapon menu — change primary and sidearm mid-session'],
   ['Esc', 'Pause & release mouse'],
 ];
 
@@ -143,8 +144,8 @@ export function SettingsPage() {
                 ]}
               />
               <p className="mt-2 text-xs text-dim">
-                Skins: Gaia Vandal, Reaver Phantom and Arcane Sheriff (also carried by Sage bots). The Classic keeps its simple model. Applies on the next
-                session.
+                Skins: 3D models for all eight guns (Sage bots carry the Vandal). Simple: guns built from basic shapes, lighter on slow machines. Applies on
+                the next session.
               </p>
             </Field>
           )}

@@ -7,7 +7,7 @@ export type Vec3 = [number, number, number];
 /* Weapons                                                             */
 /* ------------------------------------------------------------------ */
 
-export type WeaponId = 'vandal' | 'phantom' | 'sheriff' | 'classic';
+export type WeaponId = 'vandal' | 'phantom' | 'spectre' | 'guardian' | 'operator' | 'sheriff' | 'ghost' | 'classic';
 export type WeaponSlot = 'primary' | 'secondary';
 
 export interface DamageBracket {
@@ -58,7 +58,7 @@ export interface WeaponConfig {
   id: WeaponId;
   name: string;
   slot: WeaponSlot;
-  category: 'Rifle' | 'Sidearm';
+  category: 'Rifle' | 'SMG' | 'Sniper' | 'Sidearm';
   description: string;
   fireRate: number; // rounds per second
   auto: boolean;
@@ -71,11 +71,22 @@ export interface WeaponConfig {
   recoil: RecoilConfig;
   /** Right-click behaviour. */
   altFire: 'ads' | 'burst';
-  ads: { zoom: number; moveSpeedMult: number; fireRateMult: number; transitionTime: number };
+  /**
+   * `scope`: a sniper scope. Right click cycles not scoped → `zoom` → `zoom2` → not scoped (instead of
+   * hold-to-aim); scoped shows the scope overlay, hides the gun and uses the scoped sensitivity multiplier.
+   */
+  ads: { zoom: number; moveSpeedMult: number; fireRateMult: number; transitionTime: number; scope?: boolean; zoom2?: number };
+  /**
+   * Bolt action: the bolt is worked after every shot. The scope drops while it is and comes back by itself
+   * at the same zoom, and the last round of a magazine goes straight into the reload.
+   */
+  boltAction?: boolean;
   burst?: { count: number; interval: number; spread: number; cooldown: number };
   runSpeedMult: number;
   tracer: boolean;
-  sound: 'rifle-heavy' | 'rifle-suppressed' | 'pistol-light' | 'pistol-heavy';
+  sound: 'rifle-heavy' | 'rifle-suppressed' | 'rifle-dmr' | 'smg-suppressed' | 'sniper' | 'pistol-light' | 'pistol-heavy' | 'pistol-suppressed';
+  /** Suppressed guns are quieter, have a small muzzle flash and cast no muzzle light. */
+  suppressed?: boolean;
   color: string;
 }
 
@@ -94,6 +105,8 @@ export type BotBehavior =
 
 export type Difficulty = 'easy' | 'normal' | 'hard' | 'radiant' | 'custom';
 
+export type BotWeapons = 'mixed' | 'rifles' | 'pistols' | 'mirror';
+
 export interface BotTuning {
   /** Base reaction time in milliseconds. */
   reactionMs: number;
@@ -103,6 +116,8 @@ export interface BotTuning {
   headshotChance: number;
   /** Multiplier on the damage bots deal to the player (1 = real weapon damage). */
   damageMult: number;
+  /** How many bots may shoot at the player at the same time (0 = no limit). The rest hold fire until a slot frees up. */
+  maxAttackers: number;
   /** 0..1 — how often bots initiate peeks. */
   peekFrequency: number;
   /** Seconds a bot stays exposed on a committed peek. */
@@ -183,6 +198,8 @@ export interface PracticeConfig {
   secondary: WeaponId;
   botCount: number;
   behavior: BotBehavior;
+  /** What bots carry: a mix of every gun but the sniper, rifles only, sidearms only, or the player's own primary. */
+  botWeapons: BotWeapons;
   difficulty: Difficulty;
   tuning: BotTuning;
   /** Session length in seconds; 0 = unlimited. */
@@ -400,6 +417,8 @@ export interface HudState {
   reloading: boolean;
   reloadProgress: number;
   ads: boolean;
+  /** Scoped weapons: the zoom level the scope is at (0 = not scoped). */
+  scopeZoom: number;
   kills: number;
   deaths: number;
   score: number;
@@ -430,5 +449,6 @@ export interface KillFeedEntry {
 export type EngineStatus = 'loading' | 'ready' | 'running' | 'paused' | 'ended' | 'error';
 
 export interface PauseInfo {
-  reason: 'user' | 'pointer-lock' | 'blur' | 'hidden' | 'context-lost' | 'start';
+  /** 'loadout': the player opened the weapon menu (B). */
+  reason: 'user' | 'pointer-lock' | 'blur' | 'hidden' | 'context-lost' | 'start' | 'loadout';
 }

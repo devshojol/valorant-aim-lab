@@ -19,7 +19,9 @@ export type Action =
   /** Swap to the other weapon (mouse wheel). */
   | 'swap'
   | 'fire'
-  | 'alt';
+  | 'alt'
+  /** Open the weapon menu. */
+  | 'loadout';
 
 /** Minimum time between two wheel-driven weapon swaps. */
 const WHEEL_COOLDOWN_MS = 180;
@@ -42,6 +44,7 @@ const KEYMAP: Record<string, Action> = {
   KeyR: 'reload',
   Digit1: 'primary',
   Digit2: 'secondary',
+  KeyB: 'loadout',
 };
 
 export class Input {

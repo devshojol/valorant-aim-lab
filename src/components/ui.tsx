@@ -10,6 +10,11 @@ export function PageHeader({ kicker, title, children }: { kicker: string; title:
       <div>
         <div className="font-display text-sm font-semibold uppercase tracking-[0.25em] text-accent">{kicker}</div>
         <h1 className="font-display text-4xl font-bold uppercase leading-none text-ink md:text-5xl">{title}</h1>
+        <div className="mt-3 flex items-center gap-1.5" aria-hidden="true">
+          <span className="h-[3px] w-12 bg-accent" />
+          <span className="h-[3px] w-3 bg-accent/50" />
+          <span className="h-[3px] w-1.5 bg-accent/25" />
+        </div>
       </div>
       {children}
     </div>
@@ -18,10 +23,10 @@ export function PageHeader({ kicker, title, children }: { kicker: string; title:
 
 export function Card({ children, className, title, right }: { children: ReactNode; className?: string; title?: string; right?: ReactNode }) {
   return (
-    <section className={cx('border border-line bg-panel/90 p-5', className)}>
+    <section className={cx('tal-card border border-line bg-panel/90 p-5', className)}>
       {(title || right) && (
         <div className="mb-4 flex items-center justify-between gap-3">
-          {title && <h2 className="font-display text-lg font-semibold uppercase tracking-wider text-ink">{title}</h2>}
+          {title && <h2 className="tal-card-title font-display text-lg font-semibold uppercase tracking-wider text-ink">{title}</h2>}
           {right}
         </div>
       )}
@@ -51,7 +56,7 @@ export function Button({
 }) {
   const sizes = { sm: 'px-3 py-1.5 text-sm', md: 'px-5 py-2.5 text-base', lg: 'px-8 py-4 text-xl' };
   const variants = {
-    primary: 'bg-accent text-white hover:bg-[#ff5d6a] active:translate-y-px',
+    primary: 'tal-primary bg-accent text-white hover:bg-[#ff5d6a] active:translate-y-px',
     ghost: 'bg-transparent text-mute hover:text-ink hover:bg-white/5',
     outline: 'border border-line bg-panel2 text-ink hover:border-mute',
     danger: 'border border-accent/50 bg-accent/10 text-accent hover:bg-accent/20',

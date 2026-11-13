@@ -1,10 +1,11 @@
 import { LogOut, MousePointer2, Play, RotateCcw, Square, TriangleAlert } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import type { EngineStatus, HudState, KillFeedEntry, PauseInfo, PracticeConfig, SessionStats } from '../types';
+import type { EngineStatus, HudState, KillFeedEntry, PauseInfo, PracticeConfig, SessionStats, WeaponId } from '../types';
 import { GameEngine } from '../game/engine/GameEngine';
 import { store, useAppStore } from '../hooks/useAppStore';
 import { Hud } from '../components/hud/Hud';
 import { SessionReportBody } from '../components/SessionReport';
+import { LoadoutMenu } from '../components/LoadoutMenu';
 import { Button, Slider } from '../components/ui';
 import { MODE_INFO, locationName, mapName } from '../utils/labels';
 import { WEAPONS } from '../game/weapons/weaponConfigs';
@@ -24,6 +25,7 @@ const PAUSE_TEXT: Record<PauseInfo['reason'], string> = {
   hidden: 'Paused — tab hidden',
   'context-lost': 'Paused — graphics context lost',
   start: 'Ready',
+  loadout: 'Weapon menu',
 };
 
 export function GamePage({ config }: { config: PracticeConfig }) {
@@ -40,6 +42,8 @@ export function GamePage({ config }: { config: PracticeConfig }) {
   const [report, setReport] = useState<SessionStats | null>(null);
   const [renderer, setRenderer] = useState('');
   const [startIssue, setStartIssue] = useState<'cooldown' | 'blocked' | null>(null);
+  /** Weapons in hand; the weapon menu (B) changes them mid-session. */
+  const [loadout, setLoadout] = useState({ primary: config.primary, secondary: config.secondary });
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +52,7 @@ export function GamePage({ config }: { config: PracticeConfig }) {
     setHud(null);
     setFeed([]);
     setError(null);
+    setLoadout({ primary: config.primary, secondary: config.secondary });
     // One engine per mount. It can be disposed while still loading (React StrictMode mounts
     // effects twice in dev, and Quit/Restart can happen mid-load) — dispose() cancels the build.
     const engine = GameEngine.create({ container: hostRef.current!, overlay: overlayRef.current!, config, settings: store.get().settings });
@@ -114,6 +119,27 @@ export function GamePage({ config }: { config: PracticeConfig }) {
     }
   };
 
+  const pickWeapon = async (slot: 0 | 1, id: WeaponId) => {
+    const e = engineRef.current;
+    if (!e) return;
+    await e.setWeapon(slot, id);
+    if (engineRef.current !== e) return;
+    setLoadout(e.loadout);
+    // remembered as the default loadout for the next session
+    store.updatePractice(slot === 0 ? { primary: id } : { secondary: id });
+  };
+  const inLoadout = status === 'paused' && pause?.reason === 'loadout' && !report;
+
+  // B closes the weapon menu again (the key press is a user gesture, so the mouse can be re-captured)
+  useEffect(() => {
+    if (!inLoadout) return;
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.code === 'KeyB' && !ev.repeat) void resume();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [inLoadout]);
+
   const endSession = () => engineRef.current?.end();
   const quit = () => {
     const e = engineRef.current;
@@ -124,7 +150,7 @@ export function GamePage({ config }: { config: PracticeConfig }) {
   const restart = () => {
     const e = engineRef.current;
     if (e && e.status !== 'ended' && e.status !== 'loading') e.end();
-    store.play({ ...config });
+    store.play({ ...config, ...loadout });
   };
 
   const sens = settings.sensitivity;
@@ -145,9 +171,11 @@ export function GamePage({ config }: { config: PracticeConfig }) {
 
       {status === 'loading' && !error && (
         <div className="absolute inset-0 grid place-items-center bg-bg">
-          <div className="text-center">
-            <div className="mx-auto h-10 w-10 animate-spin border-2 border-accent border-t-transparent" />
-            <div className="mt-4 font-display text-xl uppercase tracking-widest text-mute">Building {mapName(config.mapId)}…</div>
+          <div className="w-72 text-center">
+            <div className="font-display text-xs font-semibold uppercase tracking-[0.35em] text-accent">{MODE_INFO[config.mode].label}</div>
+            <div className="mt-1 font-display text-4xl font-bold uppercase leading-none">{mapName(config.mapId)}</div>
+            <div className="tal-loadbar mt-5" />
+            <div className="mt-3 text-xs uppercase tracking-widest text-dim">Building the map…</div>
           </div>
         </div>
       )}
@@ -167,9 +195,11 @@ export function GamePage({ config }: { config: PracticeConfig }) {
         </div>
       )}
 
-      {(status === 'ready' || status === 'paused') && !report && (
+      {inLoadout && <LoadoutMenu primary={loadout.primary} secondary={loadout.secondary} onPick={(slot, id) => void pickWeapon(slot, id)} onClose={() => void resume()} issue={startIssue} />}
+
+      {(status === 'ready' || status === 'paused') && !report && !inLoadout && (
         <div className="absolute inset-0 grid place-items-center bg-black/55 backdrop-blur-[2px]">
-          <div className="w-[min(560px,92vw)] border border-line bg-panel/95 p-7">
+          <div className="tal-card w-[min(560px,92vw)] border border-line bg-panel/95 p-7">
             <div className="font-display text-sm font-semibold uppercase tracking-[0.25em] text-accent">
               {status === 'ready' ? 'Ready' : PAUSE_TEXT[pause?.reason ?? 'user']}
             </div>
@@ -178,11 +208,11 @@ export function GamePage({ config }: { config: PracticeConfig }) {
             </div>
             <div className="mt-1 text-sm text-mute">
               {mapName(config.mapId)} · {locationName(config.mapId, config.locationId)} · {config.side === 'attack' ? 'Attacking' : 'Defending'} ·{' '}
-              {WEAPONS[config.primary].name}
+              {WEAPONS[loadout.primary].name}
             </div>
             <button
               onClick={() => void resume()}
-              className="clip-angle mt-6 flex w-full items-center justify-center gap-3 bg-accent py-5 font-display text-2xl font-bold uppercase tracking-widest text-white hover:bg-[#ff5d6a]"
+              className="tal-primary clip-angle mt-6 flex w-full items-center justify-center gap-3 bg-accent py-5 font-display text-2xl font-bold uppercase tracking-widest text-white hover:bg-[#ff5d6a]"
             >
               {status === 'ready' ? <Play size={24} /> : <MousePointer2 size={22} />}
               {status === 'ready' ? 'Click to start' : 'Click to resume'}
@@ -238,6 +268,7 @@ export function GamePage({ config }: { config: PracticeConfig }) {
               <span>Ctrl / C crouch · Space jump</span>
               <span>LMB fire · RMB aim / burst</span>
               <span>R reload · 1 / 2 or wheel weapons</span>
+              <span>B weapon menu</span>
               <span>Esc pause</span>
             </div>
           </div>
@@ -251,7 +282,7 @@ export function GamePage({ config }: { config: PracticeConfig }) {
             <div className="mb-4 font-display text-5xl font-bold uppercase">Session report</div>
             <SessionReportBody s={report} />
             <div className="mt-6 flex flex-wrap gap-2">
-              <Button onClick={() => store.play({ ...config })}>
+              <Button onClick={() => store.play({ ...config, ...loadout })}>
                 <RotateCcw size={16} /> Play again
               </Button>
               <Button
