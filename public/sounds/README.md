@@ -37,8 +37,7 @@ Example:
   `kill-5.mp3`. The jump, landing and headshot slots have no recording, so they stay synthesised.
 - The Classic, Ghost, Spectre, Guardian and Operator takes were cut from recordings supplied by the project owner
   with `scripts/extract-gun-samples-2.py` (isolated shots with their natural tail; the Spectre takes are the last
-  shot of each burst). They replace the earlier stand-ins from the CC0 Free Firearm Sound Library
-  (`scripts/extract-firearm-library.py`).
+  shot of each burst).
 - WAV, MP3 or OGG all work. When a slot lists several files, one is picked at random each time (footsteps and shots
   also get a small pitch variation), so repeats don't sound looped.
 - Silence at the start and end of every file is trimmed when it loads, so sounds play on time. The engine adds

@@ -139,6 +139,7 @@ export class GameEngine {
   private frameMs = 16;
   /** Debug only: game-time multiplier (0 freezes the simulation; see debug.timeScale). */
   private debugTimeScale = 1;
+  private debugSpectate: { index: number; angle: number; dist: number } | null = null;
   private boltAge = -1;
   private hudTimer = 0;
   private visTimer = 0;
@@ -366,7 +367,7 @@ export class GameEngine {
             })
           : Promise.resolve(new Map<WeaponId, WeaponSkin>()),
         wantAgent
-          ? import('../bots/AgentVisual').then((m) => m.AgentAssets.load(scene, 'models/sage.glb', this.botAssets)).catch((err) => {
+          ? import('../bots/AgentVisual').then((m) => m.AgentAssets.load(scene, 'models/miks.glb', this.botAssets)).catch((err) => {
               console.warn('[bots] agent model unavailable — using training dummies', err);
               failed.push('the agent bot model');
               return null;
@@ -411,7 +412,7 @@ export class GameEngine {
       config: this.config,
       tracker: this.tracker,
       createVisual: (id) =>
-        this.agentAssets ? this.agentAssets.create(id, fx !== 'low') : new BotVisual(this.botAssets, id, fx !== 'low'),
+        this.agentAssets ? this.agentAssets.create(id) : new BotVisual(this.botAssets, id),
       rng: Math.random,
     });
 
@@ -863,6 +864,16 @@ export class GameEngine {
     this.camera.rotation.y = this.player.yaw + py * DEG;
     this.camera.rotation.x = -(this.player.pitch + pp * DEG);
     this.camera.fov = 2 * Math.atan(Math.tan(BASE_HFOV / 2) / this.weapons.zoom);
+    const sp = this.debugSpectate;
+    const b = sp ? this.director.bots[sp.index] : null;
+    if (sp && b) {
+      // debug: watch a bot from outside (animation checks)
+      const a = b.yaw + sp.angle;
+      this.camera.position.set(b.x + Math.sin(a) * sp.dist, b.y + 1.25, b.z + Math.cos(a) * sp.dist);
+      this.camera.rotation.y = a + Math.PI + 0.24;
+      this.camera.rotation.x = 0.1;
+      this.camera.fov = BASE_HFOV;
+    }
   }
 
   /** True while a sniper scope is fully raised. */
@@ -1323,6 +1334,10 @@ export class GameEngine {
     /** Scale game time (0 = frozen, 1 = normal) so screenshots can be taken at exact moments. */
     timeScale: (s: number) => {
       this.debugTimeScale = Math.max(0, s);
+    },
+    /** Watch bot `index` from `dist` metres, `angle` radians round from its front (null = back to first person). */
+    spectate: (index: number | null, angle = 0.8, dist = 3.2) => {
+      this.debugSpectate = index === null ? null : { index, angle, dist };
     },
     godMode: (on: boolean) => {
       this.ctx.botsShootBack = !on;

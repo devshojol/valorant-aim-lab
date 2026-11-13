@@ -1,6 +1,6 @@
 import type { BotTuning, Vec3, WeaponConfig } from '../../types';
 import type { MapData } from '../maps/MapData';
-import type { CollisionWorld } from '../physics/CollisionWorld';
+import { COL_SIGHT, type CollisionWorld } from '../physics/CollisionWorld';
 import type { PlayerController } from '../player/PlayerController';
 import { WEAPONS, recoilAt } from '../weapons/weaponConfigs';
 import { smoothstep } from '../weapons/WeaponSystem';
@@ -12,6 +12,9 @@ const BOT_RUN = 5.4;
 const ACCEL = 45;
 const DECEL = 72;
 const GRAVITY = 20;
+/** Beyond this bots tap; inside CLOSE_RANGE they spray (metres). */
+const LONG_RANGE = 28;
+export const CLOSE_RANGE = 9;
 
 export interface BotContext {
   time: number;
@@ -99,6 +102,11 @@ export class Bot {
   reactAt = Infinity;
   lastSeenTime = -99;
   lastKnown: [number, number] | null = null;
+  /** The player's ground velocity when last seen (which way they were heading). */
+  lastVel: [number, number] = [0, 0];
+  /** Which parts of the player are in view (the bot aims at one it can actually hit). */
+  private seesHead = true;
+  private seesChest = true;
   private perceptionTimer = 0;
 
   // aim
@@ -114,6 +122,11 @@ export class Bot {
   recoilIdx = 0;
   shotsFired = 0;
   sinceShot = 10;
+  /** Rounds left in the magazine; an empty one is reloaded (the bot can't shoot meanwhile). */
+  ammo = WEAPONS.vandal.magazine;
+  reloadLeft = 0;
+  /** Steer away from other bots standing on the same spot (roaming bots). */
+  separate = false;
 
   // practice metrics
   visibleToPlayer = false;
@@ -142,6 +155,22 @@ export class Bot {
   }
   get speed() {
     return Math.hypot(this.vx, this.vz);
+  }
+  get reloading() {
+    return this.reloadLeft > 0;
+  }
+  /** Give the bot a gun with a full magazine. */
+  setWeapon(w: WeaponConfig) {
+    this.weapon = w;
+    this.ammo = w.magazine;
+    this.reloadLeft = 0;
+  }
+  /** Start a reload (no-op when full or already reloading). */
+  reload() {
+    if (this.reloadLeft > 0 || this.ammo >= this.weapon.magazine) return;
+    this.reloadLeft = this.weapon.reloadTime;
+    this.burstLeft = 0;
+    this.visual?.reload?.(this.weapon.reloadTime);
   }
   get maxRun() {
     return BOT_RUN * this.tuning.moveSpeed;
@@ -173,6 +202,9 @@ export class Bot {
     this.burstLeft = 0;
     this.burstPause = 0;
     this.recoilIdx = 0;
+    this.ammo = this.weapon.magazine;
+    this.reloadLeft = 0;
+    this.lastVel = [0, 0];
     this.wantsToShoot = false;
     this.sprayMode = false;
     this.visibleToPlayer = false;
@@ -229,7 +261,11 @@ export class Bot {
     if (visible) {
       if (!this.seesPlayer) this.acquire(ctx);
       this.lastKnown = [p.pos.x, p.pos.z];
+      this.lastVel = [p.vel.x, p.vel.z];
       this.lastSeenTime = ctx.time;
+      const legH = 0.86 - 0.55 * p.crouch;
+      this.seesHead = ctx.world.segmentClear(ex, ey, ez, p.pos.x, p.pos.y + legH + 0.75, p.pos.z, COL_SIGHT);
+      this.seesChest = ctx.world.segmentClear(ex, ey, ez, p.pos.x, p.pos.y + legH + 0.28, p.pos.z, COL_SIGHT);
     }
     this.seesPlayer = visible;
   }
@@ -258,11 +294,20 @@ export class Bot {
   /* Aim + shooting                                                 */
   /* ------------------------------------------------------------- */
 
+  /**
+   * Where the bot is trying to put its crosshair: the head or chest (whichever it chose and can
+   * see), trailing a moving player by a moment — a short one for sharp bots, so strafing throws
+   * off weak bots much more than strong ones.
+   */
   private aimTargetPoint(ctx: BotContext): Vec3 {
     const p = ctx.player;
     const legH = 0.86 - 0.55 * p.crouch;
-    const y = p.pos.y + (this.aimZone === 'head' ? legH + 0.75 : legH + 0.28);
-    return [p.pos.x, y, p.pos.z];
+    let head = this.aimZone === 'head';
+    if (head && !this.seesHead && this.seesChest) head = false;
+    else if (!head && !this.seesChest && this.seesHead) head = true;
+    const y = p.pos.y + (head ? legH + 0.75 : legH + 0.28);
+    const lag = lerp(0.1, 0.012, this.acc);
+    return [p.pos.x - p.vel.x * lag, y, p.pos.z - p.vel.z * lag];
   }
 
   private updateAim(ctx: BotContext, dt: number) {
@@ -310,10 +355,19 @@ export class Bot {
     this.sinceShot += dt;
     if (this.sinceShot > Math.max(w.recoil.recoveryDelay, (1 / w.fireRate) * 1.15)) this.recoilIdx = Math.max(0, this.recoilIdx - w.recoil.recoveryRate * dt);
     if (this.burstPause > 0) this.burstPause -= dt;
+    if (this.reloadLeft > 0) {
+      this.reloadLeft -= dt;
+      if (this.reloadLeft <= 0) {
+        this.reloadLeft = 0;
+        this.ammo = w.magazine;
+        this.recoilIdx = 0;
+      }
+    }
 
     const canShoot =
       ctx.botsShootBack &&
       this.wantsToShoot &&
+      this.reloadLeft <= 0 &&
       this.seesPlayer &&
       ctx.player.alive &&
       ctx.time >= this.reactAt &&
@@ -332,16 +386,23 @@ export class Bot {
     if (this.aimError(ctx) > tolerance) return;
     if (this.fireCooldown > 0) return;
 
+    const dist = Math.hypot(ctx.player.pos.x - this.x, ctx.player.pos.z - this.z);
     if (this.burstLeft <= 0) {
       const base = Math.max(1, Math.round(this.tuning.burstLength));
       // semi-automatic guns are tapped: one or two shots, then a pause
       if (!w.auto) this.burstLeft = w.fireRate < 1.5 ? 1 : 1 + Math.floor(ctx.rng() * 2);
-      else this.burstLeft = this.sprayMode ? base + 6 + Math.floor(ctx.rng() * 6) : base + Math.floor(ctx.rng() * 2);
+      else if (this.sprayMode) this.burstLeft = base + 6 + Math.floor(ctx.rng() * 6);
+      // range discipline: tap at long range, burst at medium, spray up close
+      else if (dist > LONG_RANGE) this.burstLeft = Math.min(base, 1 + Math.floor(ctx.rng() * 2));
+      else if (dist < CLOSE_RANGE) this.burstLeft = base + 3 + Math.floor(ctx.rng() * 4);
+      else this.burstLeft = base + Math.floor(ctx.rng() * 2);
     }
     this.fireOnce(ctx, speedFrac);
     this.fireCooldown = Math.max(this.fireCooldown, -0.05) + (w.auto ? 1 : 1.3) / w.fireRate;
     this.burstLeft--;
-    if (this.burstLeft <= 0) this.burstPause = lerp(0.5, 0.22, this.acc) * (0.8 + ctx.rng() * 0.5);
+    this.ammo--;
+    if (this.ammo <= 0) this.reload();
+    else if (this.burstLeft <= 0) this.burstPause = lerp(0.5, 0.22, this.acc) * (0.8 + ctx.rng() * 0.5) * (dist < CLOSE_RANGE ? 0.7 : 1);
   }
 
   private fireOnce(ctx: BotContext, speedFrac: number) {
@@ -378,9 +439,25 @@ export class Bot {
       const dist = Math.hypot(dx, dz);
       if (dist > 0.02) {
         // arrive: decelerate so we stop on the target (sharp, counter-strafe-like stop)
-        const sp = Math.min(this.moveSpeed, Math.sqrt(2 * DECEL * 0.8 * dist));
+        // crouch-walking is about half speed
+        const sp = Math.min(this.moveSpeed * (1 - 0.5 * this.crouch), Math.sqrt(2 * DECEL * 0.8 * dist));
         tvx = (dx / dist) * sp;
         tvz = (dz / dist) * sp;
+      }
+    }
+    if (this.separate) {
+      for (const o of ctx.bots) {
+        if (o === this || !o.alive) continue;
+        const ox = this.x - o.x;
+        const oz = this.z - o.z;
+        const od = Math.hypot(ox, oz);
+        if (od > 1.1 || Math.abs(o.y - this.y) > 1.5) continue;
+        // standing on exactly the same point: step apart along a per-bot direction
+        const nx = od > 1e-3 ? ox / od : Math.sin(this.id * 2.4);
+        const nz = od > 1e-3 ? oz / od : Math.cos(this.id * 2.4);
+        const push = (1.1 - od) * 3;
+        tvx += nx * push;
+        tvz += nz * push;
       }
     }
     const dvx = tvx - this.vx;

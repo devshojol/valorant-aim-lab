@@ -1,37 +1,89 @@
 /**
- * Prepare a Sketchfab agent GLB for use as a bot model (public/models/sage.glb).
+ * Prepare a Sketchfab Valorant agent GLB for use as the bot model (public/models/miks.glb).
  *
- * Steps (run in a scratch folder with `npm i @gltf-transform/cli@4 @gltf-transform/core@4 @gltf-transform/extensions@4 @gltf-transform/functions@4`):
- *   npx gltf-transform center   sage.glb a.glb --pivot below          # feet on the origin
- *   npx gltf-transform resize   a.glb b.glb --width 1024 --height 1024
- *   npx gltf-transform simplify b.glb c.glb --ratio 0.5 --error 0.0008
- *   npx gltf-transform webp     c.glb d.glb --quality 82
- *   npx gltf-transform prune    d.glb e.glb
- *   node prepare-agent-model.mjs e.glb sage.glb                       # this script: shrink the skeleton
+ * Run from a scratch folder that has the tools installed:
+ *   npm i @gltf-transform/core@4 @gltf-transform/extensions@4 @gltf-transform/functions@4 meshoptimizer sharp
+ *   node prepare-agent-model.mjs <downloaded.glb> <out.glb> [triangle ratio = 0.5]
+ * then run scripts/compress-models.mjs over public/models.
  *
- * This script collapses the game rig to the joints the bot posing uses (src/game/bots/AgentVisual.ts).
- * In this asset the rest pose equals the bind pose, so moving a removed joint's skin weights onto its
- * nearest kept ancestor leaves the rest shape unchanged.
+ * Steps:
+ *  - mesh welded and simplified (the model must already stand on the origin), textures resized to 1024 px WebP;
+ *  - the game rig (hundreds of face, finger, twist and cloth joints) collapsed to the joints the bot
+ *    posing uses (src/game/bots/AgentVisual.ts). Joints are matched by name without the numeric
+ *    suffix the exporter adds, so any agent on the same rig works. In these assets the rest pose
+ *    equals the bind pose, so moving a removed joint's skin weights onto its nearest kept ancestor
+ *    leaves the rest shape unchanged. The bind matrices are rebuilt from the rest pose.
  */
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
-import { prune } from '@gltf-transform/functions';
-const KEEP = new Set(['GLTF_created_0_rootJoint', 'Skeleton_1', 'Root_2', 'Splitter_3', 'Spine1_4', 'Spine2_5', 'Spine3_6', 'Spine4_7', 'Neck_8', 'Head_10',
-  'L_Eyeball_35', 'R_Eyeball_36', 'L_Clavicle_134', 'L_Shoulder_135', 'L_Elbow_136', 'L_Hand_137', 'L_Middle1_142',
-  'R_Clavicle_169', 'R_Shoulder_170', 'R_Elbow_171', 'R_Hand_172', 'R_Middle1_180', 'Pelvis_213',
-  'L_Hip_214', 'L_Knee_215', 'L_Foot_217', 'L_Toe_218', 'R_Hip_225', 'R_Knee_226', 'R_Foot_228', 'R_Toe_229']);
+import { dedup, prune, simplify, textureCompress, weld } from '@gltf-transform/functions';
+import { MeshoptSimplifier } from 'meshoptimizer';
+import sharp from 'sharp';
+
+const [, , input, output, ratioArg] = process.argv;
+if (!input || !output) throw new Error('usage: node prepare-agent-model.mjs <in.glb> <out.glb> [ratio]');
+const ratio = Number(ratioArg ?? 0.5);
+
+/** Joint name without the exporter's numeric suffix ("L_Hand_0201" → "L_Hand"). */
+const base = (name) => (name.endsWith('rootJoint') ? '_rootJoint' : name.replace(/_\d+$/, ''));
+const KEEP = new Set(['_rootJoint', 'Skeleton', 'Root', 'Splitter', 'Spine1', 'Spine2', 'Spine3', 'Spine4', 'Neck', 'Head',
+  'L_Eyeball', 'R_Eyeball', 'L_Clavicle', 'L_Shoulder', 'L_Elbow', 'L_Hand', 'L_Middle1',
+  'R_Clavicle', 'R_Shoulder', 'R_Elbow', 'R_Hand', 'R_Middle1', 'Pelvis',
+  'L_Hip', 'L_Knee', 'L_Foot', 'L_Toe', 'R_Hip', 'R_Knee', 'R_Foot', 'R_Toe']);
+/** Removed joints that must follow a kept joint which is not their ancestor (the face rig hangs off a twin of the head). */
+const ALIAS = { Head_CS: 'Head' };
+
+/** Inverse of a column-major 4×4 matrix. */
+function invert(m) {
+  const a = Array.from({ length: 4 }, (_, r) => [m[r], m[4 + r], m[8 + r], m[12 + r], ...[0, 1, 2, 3].map((c) => (c === r ? 1 : 0))]);
+  for (let c = 0; c < 4; c++) {
+    let p = c;
+    for (let r = c + 1; r < 4; r++) if (Math.abs(a[r][c]) > Math.abs(a[p][c])) p = r;
+    [a[c], a[p]] = [a[p], a[c]];
+    const d = a[c][c];
+    if (Math.abs(d) < 1e-12) throw new Error('singular joint matrix');
+    for (let k = 0; k < 8; k++) a[c][k] /= d;
+    for (let r = 0; r < 4; r++) {
+      if (r === c) continue;
+      const f = a[r][c];
+      for (let k = 0; k < 8; k++) a[r][k] -= f * a[c][k];
+    }
+  }
+  const out = new Float32Array(16);
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) out[c * 4 + r] = a[r][4 + c];
+  return out;
+}
+
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS);
-const doc = await io.read(process.argv[2]);
+const doc = await io.read(input);
+await MeshoptSimplifier.ready;
+await doc.transform(
+  dedup(),
+  weld(),
+  simplify({ simplifier: MeshoptSimplifier, ratio, error: 0.0008 }),
+  textureCompress({ encoder: sharp, targetFormat: 'webp', quality: 82, resize: [1024, 1024] }),
+);
+
 const root = doc.getRoot();
 const skin = root.listSkins()[0];
 const joints = skin.listJoints();
 const parentOf = new Map();
 for (const n of root.listNodes()) for (const c of n.listChildren()) parentOf.set(c, n);
-const keptAncestor = (j) => { let n = j; while (n && !KEEP.has(n.getName())) n = parentOf.get(n); if (!n) throw new Error('no kept ancestor for ' + j.getName()); return n; };
-const keptJoints = joints.filter((j) => KEEP.has(j.getName()));
-if (keptJoints.length !== KEEP.size) throw new Error('missing joints: ' + [...KEEP].filter((k) => !keptJoints.some((j) => j.getName() === k)));
+const keptJoints = joints.filter((j) => KEEP.has(base(j.getName())));
+const missing = [...KEEP].filter((k) => !keptJoints.some((j) => base(j.getName()) === k));
+if (missing.length) throw new Error('missing joints: ' + missing);
+if (keptJoints.length !== KEEP.size) throw new Error('ambiguous joint names: ' + keptJoints.map((j) => j.getName()));
+const byBase = new Map(keptJoints.map((j) => [base(j.getName()), j]));
+const keptFor = (j) => {
+  for (let n = j; n; n = parentOf.get(n)) {
+    const b = base(n.getName());
+    if (KEEP.has(b)) return n;
+    if (ALIAS[b]) return byBase.get(ALIAS[b]);
+  }
+  throw new Error('no kept ancestor for ' + j.getName());
+};
 const newIndex = new Map(keptJoints.map((j, i) => [j, i]));
-const remap = joints.map((j) => newIndex.get(keptAncestor(j)));
+const remap = joints.map((j) => newIndex.get(keptFor(j)));
 for (const mesh of root.listMeshes()) for (const prim of mesh.listPrimitives()) {
   const J = prim.getAttribute('JOINTS_0'), W = prim.getAttribute('WEIGHTS_0');
   if (!J || !W) continue;
@@ -41,20 +93,24 @@ for (const mesh of root.listMeshes()) for (const prim of mesh.listPrimitives()) 
     for (let k = 0; k < 4; k++) { const w = wa[v * 4 + k]; if (w <= 0) continue; const nj = remap[ja[v * 4 + k]]; acc.set(nj, (acc.get(nj) ?? 0) + w); }
     const list = [...acc.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
     const sum = list.reduce((s, [, w]) => s + w, 0) || 1;
-    for (let k = 0; k < 4; k++) { ja[v * 4 + k] = list[k] ? list[k][0] : 0; wa[v * 4 + k] = list[k] ? list[k][1] / sum : 0; }
+    const full = W.getNormalized() ? (wa instanceof Uint8Array ? 255 : 65535) : 1;
+    for (let k = 0; k < 4; k++) { ja[v * 4 + k] = list[k] ? list[k][0] : 0; wa[v * 4 + k] = list[k] ? (list[k][1] / sum) * full : 0; }
   }
   J.setArray(ja); W.setArray(wa);
 }
-const oldIbm = skin.getInverseBindMatrices().getArray();
+// Bind matrices are rebuilt from the rest pose (rest pose = bind pose). The exporter leaves a
+// placeholder matrix on joints that had no skin weights of their own, and those joints now carry
+// the weights of the twist and helper joints below them.
 const ibm = new Float32Array(keptJoints.length * 16);
-keptJoints.forEach((j, i) => ibm.set(oldIbm.subarray(joints.indexOf(j) * 16, joints.indexOf(j) * 16 + 16), i * 16));
+keptJoints.forEach((j, i) => ibm.set(invert(j.getWorldMatrix()), i * 16));
 skin.getInverseBindMatrices().setArray(ibm);
 for (const j of joints) skin.removeJoint(j);
 for (const j of keptJoints) skin.addJoint(j);
-// drop removed joint nodes (deepest first)
-const removed = joints.filter((j) => !KEEP.has(j.getName()));
+// drop the removed joint nodes
+const removed = joints.filter((j) => !KEEP.has(base(j.getName())));
 for (const j of removed) { const p = parentOf.get(j); if (p) p.removeChild(j); }
 for (const j of removed) j.dispose();
 await doc.transform(prune());
-await io.write(process.argv[3], doc);
-console.log('joints', joints.length, '->', keptJoints.length, 'nodes now', root.listNodes().length);
+await io.write(output, doc);
+const tris = root.listMeshes().flatMap((m) => m.listPrimitives()).reduce((s, p) => s + p.getIndices().getCount() / 3, 0);
+console.log('joints', joints.length, '->', keptJoints.length, '| triangles', tris, '| nodes', root.listNodes().length);

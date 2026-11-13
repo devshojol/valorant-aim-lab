@@ -20,6 +20,8 @@ export interface BotView {
   hit(): void;
   die(): void;
   revive(): void;
+  /** Play the reload animation over `duration` seconds (optional). */
+  reload?(duration: number): void;
   update(dt: number, x: number, y: number, z: number, yaw: number, aimPitch: number, crouch: number, speed: number, groundY: number): void;
   muzzleWorld(): [number, number, number];
   dispose(): void;
@@ -95,7 +97,6 @@ export class BotVisual implements BotView {
   constructor(
     private readonly assets: BotAssets,
     id: number,
-    outline: boolean,
   ) {
     const scene = assets.scene;
     this.bodyMat = new StandardMaterial(`bot-body-${id}`, scene);
@@ -128,11 +129,6 @@ export class BotVisual implements BotView {
       m.position.set(x, y, z);
       m.material = mat;
       m.isPickable = false;
-      if (outline) {
-        m.renderOutline = true;
-        m.outlineColor = ENEMY_RED;
-        m.outlineWidth = 0.012;
-      }
       this.meshes.push(m);
       return m;
     };

@@ -122,6 +122,8 @@ export class PeekBehavior implements BotBrain {
     bot.crouchTarget = 0;
     bot.moveTarget = this.pointAt(this.hideD);
     bot.peekKind = 'none';
+    // top the magazine up behind cover once it is half empty
+    if (bot.ammo < bot.weapon.magazine * 0.5) bot.reload();
     // pre-aim the angle while waiting
     bot.faceYaw = Math.atan2(ctx.player.pos.x - bot.x, ctx.player.pos.z - bot.z);
   }
@@ -256,6 +258,8 @@ export class PeekBehavior implements BotBrain {
         bot.wantsToShoot = false;
         return;
       case 'hidden':
+        // finish reloading behind cover before a new peek (a bait sequence in progress carries on)
+        if (bot.reloading && this.repeats === 0) return;
         if (this.timer <= 0 && ctx.player.alive) this.beginPeek(bot, ctx, this.repeats > 0 ? this.plan : this.choosePlan(bot, ctx));
         return;
       case 'prep':
@@ -293,6 +297,12 @@ export class PeekBehavior implements BotBrain {
         if (this.plan === 'stationary') return; // holds until killed
         // While the player is visible and we are mid-burst, keep fighting a little longer.
         const fighting = bot.seesPlayer && bot.burstLeft > 0;
+        // magazine empty: get back behind cover to reload
+        if (bot.reloading) {
+          this.adadCycles = 0;
+          this.retreat(bot);
+          return;
+        }
         if (this.timer <= 0 && !fighting) {
           if (this.plan === 'adad' && this.adadCycles > 0) {
             this.adadCycles--;

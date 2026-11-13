@@ -74,7 +74,7 @@ export function SettingsPage() {
               ]}
             />
           </Field>
-          <Field label="Effects (decals, particles, muzzle light, enemy outlines)">
+          <Field label="Effects (decals, particles, muzzle light)">
             <Segmented
               value={g.effects}
               onChange={(v) => setG({ effects: v })}
@@ -144,7 +144,7 @@ export function SettingsPage() {
                 ]}
               />
               <p className="mt-2 text-xs text-dim">
-                Skins: 3D models for all eight guns (Sage bots carry the Vandal). Simple: guns built from basic shapes, lighter on slow machines. Applies on
+                Skins: 3D models for all eight guns (Miks bots carry the Vandal). Simple: guns built from basic shapes, lighter on slow machines. Applies on
                 the next session.
               </p>
             </Field>
@@ -172,12 +172,12 @@ export function SettingsPage() {
                 value={g.botModel}
                 onChange={(v) => setG({ botModel: v })}
                 options={[
-                  { value: 'agent', label: 'Sage (rigged)' },
+                  { value: 'agent', label: 'Miks (rigged)' },
                   { value: 'dummy', label: 'Training dummy' },
                 ]}
               />
               <p className="mt-2 text-xs text-dim">
-                Sage is a detailed animated model (~20k triangles per bot). Pick the dummy on slower machines or for big deathmatches. Applies on the next
+                Miks is a detailed animated model (~20k triangles per bot). Pick the dummy on slower machines or for big deathmatches. Applies on the next
                 session.
               </p>
             </Field>

@@ -1,32 +1,30 @@
 # Bot character model
 
-`sage.glb` is used for the bots when **Settings → Graphics → Bot model** is set to *Sage* (the default).
+`miks.glb` is used for the bots when **Settings → Graphics → Bot model** is set to *Miks* (the default).
 If the file is missing or fails to load, the game falls back to the built-in blocky training dummy.
+The model has no animations of its own: the game poses its skeleton in code (`src/game/bots/AgentVisual.ts`).
 
 ## Credit (CC BY 4.0)
 
-"[Sage | Valorant](https://sketchfab.com/3d-models/sage-valorant-17612cddefbc4f92acddc5fe76625bc2)" by
-[ILilMitch](https://sketchfab.com/ILilMitch), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/).
+"[MIKS / Valorant Agent](https://sketchfab.com/3d-models/miks-valorant-agent-d7a51cd0014b4690ba6ef3a87cde23bd)" by
+[neumann](https://sketchfab.com/neumann18), licensed under [CC BY 4.0](http://creativecommons.org/licenses/by/4.0/).
 
-The author's notes: Sage was created under Riot Games' "Legal Jibber Jabber" policy using assets owned by Riot Games.
-Riot Games does not endorse or sponsor this project. The author is not affiliated with Riot Games, and distributes the
-model free of charge for educational and personal use, in line with Riot Games' policies.
-
+Miks is a Valorant character owned by Riot Games. Riot Games does not endorse or sponsor this project.
 Keep this project free and non-commercial while it includes this model. It is not included in the single-file build.
 
 ## Changes made to the original
 
 Made with `scripts/prepare-agent-model.mjs` (see its header for the exact steps):
 
-- recentred so the feet stand on the origin,
 - textures resized from 2048 px to 1024 px and converted to WebP,
-- mesh simplified to about half the triangles (≈ 37k → 20k),
-- skeleton reduced from 261 to 31 joints (face, hair, cloth, finger and weapon joints merged into their parents).
+- mesh simplified to about half the triangles (≈ 42.6k → 22.4k),
+- skeleton reduced from 569 to 31 joints (face, hair, cloth, finger, twist and weapon joints merged into the
+  joints that stay), with the bind matrices rebuilt from the rest pose.
 
 # Weapon skins (`weapons/`)
 
 Used for the first-person guns when **Settings → Graphics → Gun models** is set to *Skins* (the default);
-Sage bots carry the Vandal. A missing or broken file falls back to the simple built-in gun.
+the bots carry the Vandal. A missing or broken file falls back to the simple built-in gun.
 The grip, support-hand, muzzle and sight points measured on each model live in `src/game/weapons/WeaponSkins.ts`.
 
 ## Credits (CC BY 4.0)
@@ -133,7 +131,7 @@ Made with `scripts/prepare-fp-arms-pistol.mjs` (2.3 MB → 0.36 MB):
 
 # Compression
 
-After the per-model steps above, every GLB here was run through `scripts/compress-models.mjs`: vertices welded,
+After the per-model steps above, every GLB here was run through `scripts/compress-models.mjs` once (run it on a
+folder holding only new files: it simplifies the Phantom again on every run): vertices welded,
 normals, tangents, UVs, joints and weights stored quantized (`KHR_mesh_quantization`; positions too on unskinned
 models), redundant animation keyframes removed, and the Phantom simplified again (about 37k → 17k triangles).
-Total size went from 7.0 MB to 3.9 MB.

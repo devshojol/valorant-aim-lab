@@ -191,7 +191,7 @@ export class PracticeDirector {
       spots: this.spots,
     });
     bot.reset();
-    bot.weapon = WEAPONS[this.pickWeapon(ctx.rng)];
+    bot.setWeapon(WEAPONS[this.pickWeapon(ctx.rng)]);
     bot.brain = brain;
     brain.start(bot, ctx);
     bot.visual?.setVisible(true);
@@ -226,7 +226,7 @@ export class PracticeDirector {
     const eye = ctx.player.eye();
     const [x, y, z] = this.dmSpawnPoint(ctx, eye, false);
     bot.reset();
-    bot.weapon = WEAPONS[this.pickWeapon(ctx.rng)];
+    bot.setWeapon(WEAPONS[this.pickWeapon(ctx.rng)]);
     bot.brain = new DeathmatchBehavior();
     bot.place(x, y, z, ctx.rng() * Math.PI * 2);
     bot.preAimed = false;

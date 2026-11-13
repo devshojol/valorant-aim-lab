@@ -149,7 +149,7 @@ export function HomePage() {
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <Card title="Recent performance" right={<Trophy size={16} className="text-warn" />}>
           <LineChart
-            labels={recent.map((s, i) => `#${sessions.length - recent.length + i + 1}`)}
+            labels={recent.map((_, i) => `#${sessions.length - recent.length + i + 1}`)}
             series={[
               { name: 'Accuracy %', color: '#ff4655', values: recent.map((s) => accuracy(s)) },
               { name: 'Headshot %', color: '#f2c14e', values: recent.map((s) => hsPct(s)) },

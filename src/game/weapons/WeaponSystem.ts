@@ -8,7 +8,7 @@ const DEG = Math.PI / 180;
 /** Share of the reload time the reload animation takes (1 = the animation ends exactly when the gun can fire). */
 export const RELOAD_ANIM_SHARE = 1;
 /** Bolt action: the scope starts coming back up this long before the next shot is ready (seconds). */
-export const RESCOPE_LEAD = 0.5;
+const RESCOPE_LEAD = 0.5;
 /**
  * Working the bolt after a shot, in seconds after it (for a gun firing every 1.67 s; scaled to others):
  * the trigger hand goes to the handle (`reach`), lifts it (`lift`), draws the bolt back (`back`), pushes it

@@ -1,12 +1,15 @@
 /**
- * Rigged agent model for bots (public/models/sage.glb), posed procedurally.
+ * Rigged agent model for bots (public/models/miks.glb), posed procedurally.
  *
  * The model ships without animations, so each frame we start from the rest pose and:
- *  - drop the pelvis for crouching and bob it while walking,
- *  - bend / twist the spine and tilt the head to follow the bot's aim pitch,
- *  - place a rifle in front of the right shoulder and solve two-bone IK so both hands hold it,
- *  - solve two-bone IK for the legs so the feet stay planted (crouch) or step (walk cycle).
- * Death reuses the dummy's "tip over" on the whole body.
+ *  - drop the pelvis for crouching, and bob / sway it with the stride,
+ *  - bend / twist the spine and tilt the head to follow the aim pitch, lean into the run and
+ *    counter-swing the shoulders against the legs,
+ *  - place a rifle in front of the right shoulder and solve two-bone IK so both hands hold it;
+ *    each shot kicks it back, a reload tilts it while the left hand swaps the magazine,
+ *  - solve two-bone IK for the legs: a gait with a planted stance phase whose length matches the
+ *    ground speed (no foot sliding) and a lifted swing phase; a staggered squat when crouched.
+ * Death buckles the knees, drops the gun arm and falls over backwards with a random roll.
  *
  * All posing is done on the glTF TransformNodes (which drive the skeleton's bones), in world
  * space, with full matrices so the loader's handedness flip (a mirrored root) can't invert
@@ -33,7 +36,6 @@ import type { PlacedSkin, WeaponSkin } from '../weapons/WeaponSkins';
 import type { BotAssets, BotView } from './BotVisual';
 import { BOT_SCALE } from './perception/visibility';
 
-const ENEMY_RED = Color3.FromHexString('#ff3b4e');
 /** Eye height of a standing bot, matching the head hitbox (legs 0.86 + head centre 0.75, × BOT_SCALE). */
 const EYE_HEIGHT = 1.63 * BOT_SCALE;
 /** Pelvis drop at full crouch — the hitboxes drop 0.55 m × BOT_SCALE, so the head stays inside its box. */
@@ -42,31 +44,52 @@ const CROUCH_DROP = 0.55 * BOT_SCALE;
 const S = BOT_SCALE;
 /** Length of the bots' rifle when a weapon skin is used (shorter than first person so both hands reach). */
 const BOT_RIFLE_LENGTH = 0.8;
+const RUN = 5.4;
 
-/** glTF node names in the agent rig. */
+/** Half the distance a planted foot travels under the body (metres), by speed fraction and crouch. */
+function gaitReach(moving: number, crouch: number) {
+  return (0.14 + 0.28 * moving) * S * (1 - 0.3 * crouch);
+}
+/** Fraction of the stride a foot spends on the ground: most of it at a walk, well under half at a run. */
+function gaitDuty(moving: number) {
+  return 0.62 - 0.22 * moving;
+}
+/** Foot position in the stride at phase p (0..1): [along the movement direction −1..1, lift 0..1]. */
+function gaitFoot(p: number, duty: number): [number, number] {
+  p -= Math.floor(p);
+  if (p < duty) return [1 - (2 * p) / duty, 0];
+  const t = (p - duty) / (1 - duty);
+  const e = t * t * (3 - 2 * t);
+  return [-1 + 2 * e, Math.sin(Math.PI * t)];
+}
+
+/**
+ * glTF node names in the agent rig, without the numeric suffix the exporter adds ("L_Hand_0201"),
+ * so any agent on the same game rig works.
+ */
 const N = {
-  pelvis: 'Splitter_3',
-  spine2: 'Spine2_5',
-  spine3: 'Spine3_6',
-  spine4: 'Spine4_7',
-  neck: 'Neck_8',
-  head: 'Head_10',
-  eyeL: 'L_Eyeball_35',
-  eyeR: 'R_Eyeball_36',
-  shoulderL: 'L_Shoulder_135',
-  elbowL: 'L_Elbow_136',
-  handL: 'L_Hand_137',
-  fingerL: 'L_Middle1_142',
-  shoulderR: 'R_Shoulder_170',
-  elbowR: 'R_Elbow_171',
-  handR: 'R_Hand_172',
-  fingerR: 'R_Middle1_180',
-  hipL: 'L_Hip_214',
-  kneeL: 'L_Knee_215',
-  footL: 'L_Foot_217',
-  hipR: 'R_Hip_225',
-  kneeR: 'R_Knee_226',
-  footR: 'R_Foot_228',
+  pelvis: 'Splitter',
+  spine2: 'Spine2',
+  spine3: 'Spine3',
+  spine4: 'Spine4',
+  neck: 'Neck',
+  head: 'Head',
+  eyeL: 'L_Eyeball',
+  eyeR: 'R_Eyeball',
+  shoulderL: 'L_Shoulder',
+  elbowL: 'L_Elbow',
+  handL: 'L_Hand',
+  fingerL: 'L_Middle1',
+  shoulderR: 'R_Shoulder',
+  elbowR: 'R_Elbow',
+  handR: 'R_Hand',
+  fingerR: 'R_Middle1',
+  hipL: 'L_Hip',
+  kneeL: 'L_Knee',
+  footL: 'L_Foot',
+  hipR: 'R_Hip',
+  kneeR: 'R_Knee',
+  footR: 'R_Foot',
 } as const;
 type NodeKey = keyof typeof N;
 
@@ -117,24 +140,21 @@ export class AgentAssets {
     const head = nodes.head.getAbsolutePosition();
     const fwd = eye.subtract(head);
     const yawFix = -Math.atan2(fwd.x, fwd.z);
-    let minY = Infinity;
-    for (const m of holder.getChildMeshes(false)) {
-      m.refreshBoundingInfo({});
-      minY = Math.min(minY, m.getBoundingInfo().boundingBox.minimumWorld.y);
-    }
-    if (!Number.isFinite(minY)) minY = 0;
-    const scale = EYE_HEIGHT / Math.max(0.5, eye.y - minY);
+    // The model stands on its origin. (A skinned mesh's bounding box can't be used for the ground
+    // height: it is in the mesh's own space, which on these rigs lies on its side, and that made
+    // the bots come out a fifth too small.)
+    const scale = EYE_HEIGHT / Math.max(0.5, eye.y);
     for (const r of probe.rootNodes) r.dispose(false, false); // materials are shared with the template
     for (const s of probe.skeletons) s.dispose();
     holder.dispose();
     return new AgentAssets(scene, container, bot, scale, yawFix);
   }
 
-  create(id: number, outline: boolean): AgentVisual {
+  create(id: number): AgentVisual {
     const entries = this.container.instantiateModelsToScene((n) => n, false, {
       doNotInstantiate: true,
     });
-    return new AgentVisual(this, id, outline, entries.rootNodes as TransformNode[], entries.skeletons);
+    return new AgentVisual(this, id, entries.rootNodes as TransformNode[], entries.skeletons);
   }
 
   dispose() {
@@ -144,7 +164,7 @@ export class AgentAssets {
 
 function findNodes(root: TransformNode): Record<NodeKey, TransformNode> {
   const byName = new Map<string, TransformNode>();
-  for (const n of root.getDescendants(false)) if (n instanceof TransformNode) byName.set(n.name, n);
+  for (const n of root.getDescendants(false)) if (n instanceof TransformNode) byName.set(n.name.replace(/_\d+$/, ''), n);
   const out = {} as Record<NodeKey, TransformNode>;
   for (const [key, name] of Object.entries(N) as [NodeKey, string][]) {
     const n = byName.get(name);
@@ -203,7 +223,16 @@ class AgentVisual implements BotView {
   private crouch = 0;
   private moveX = 0;
   private moveZ = 0;
-  private walkPhase = 0;
+  /** Position in the stride, 0..1 (left foot lands at 0, right foot at 0.5). */
+  private cycle = 0;
+  private breath = Math.random() * 6;
+  /** Recoil kick of the last shot, 1 → 0. */
+  private kick = 0;
+  private flinch = 0;
+  /** Seconds into the reload animation (−1 = not reloading). */
+  private reloadT = -1;
+  private reloadDur = 1;
+  private deathRoll = 0;
   private lastX = NaN;
   private lastZ = NaN;
   private flashTime = 0;
@@ -222,7 +251,6 @@ class AgentVisual implements BotView {
   constructor(
     private readonly assets: AgentAssets,
     id: number,
-    outline: boolean,
     rootNodes: TransformNode[],
     private readonly skeletons: Skeleton[],
   ) {
@@ -240,12 +268,6 @@ class AgentVisual implements BotView {
     for (const m of this.meshes) {
       m.isPickable = false;
       m.receiveShadows = true;
-      const eyes = m.material?.name?.includes('Eye');
-      if (outline && !eyes) {
-        m.renderOutline = true;
-        m.outlineColor = ENEMY_RED;
-        m.outlineWidth = 0.012;
-      }
       m.overlayColor = new Color3(1, 1, 1);
       m.overlayAlpha = 0.55;
     }
@@ -288,11 +310,6 @@ class AgentVisual implements BotView {
       this.rifleSkin = assets.rifle.place(this.gun, BOT_RIFLE_LENGTH, Vector3.Zero());
       for (const m of this.rifleSkin.meshes) {
         m.isPickable = false;
-        if (outline) {
-          m.renderOutline = true;
-          m.outlineColor = ENEMY_RED;
-          m.outlineWidth = 0.01;
-        }
         m.overlayColor = new Color3(1, 1, 1);
         m.overlayAlpha = 0.55;
         this.meshes.push(m);
@@ -310,11 +327,6 @@ class AgentVisual implements BotView {
       m.position.set(px, py, pz);
       m.material = dark ? a.darkMat : a.gunMat;
       m.isPickable = false;
-      if (outline) {
-        m.renderOutline = true;
-        m.outlineColor = ENEMY_RED;
-        m.outlineWidth = 0.008;
-      }
       this.meshes.push(m);
     };
     if (!this.rifleSkin) {
@@ -365,18 +377,35 @@ class AgentVisual implements BotView {
 
   muzzleFlash() {
     this.flashTime = 0.05;
+    this.kick = 1;
   }
 
   hit() {
     this.hitFlash = 0.09;
+    this.flinch = 1;
+  }
+
+  reload(duration: number) {
+    this.reloadT = 0;
+    this.reloadDur = Math.max(0.3, duration);
   }
 
   die() {
     this.deathT = 0;
+    this.deathRoll = (Math.random() - 0.5) * 0.9;
+    this.endReload();
+  }
+
+  private endReload() {
+    this.reloadT = -1;
+    this.rifleSkin?.mag?.setEnabled(true);
   }
 
   revive() {
     this.deathT = -1;
+    this.kick = 0;
+    this.flinch = 0;
+    this.endReload();
     this.root.rotation.x = 0;
     this.root.rotation.z = 0;
     this.lastX = NaN;
@@ -400,8 +429,18 @@ class AgentVisual implements BotView {
     this.yaw = yaw;
     this.aimPitch = aimPitch;
     this.crouch = crouch;
-    const moving = Math.min(1, Math.hypot(this.moveX, this.moveZ) / 5.4);
-    this.walkPhase += dt * (4 + speed * 1.6) * (moving > 0.05 ? 1 : 0);
+    void speed;
+    // the stride advances with the distance covered, so planted feet don't slide
+    const sp = Math.hypot(this.moveX, this.moveZ);
+    const moving = Math.min(1, sp / RUN);
+    if (sp > 0.2) this.cycle = (this.cycle + (dt * sp * gaitDuty(moving)) / (2 * gaitReach(moving, crouch))) % 1;
+    this.breath += dt;
+    if (this.kick > 0) this.kick = Math.max(0, this.kick - dt / 0.11);
+    if (this.flinch > 0) this.flinch = Math.max(0, this.flinch - dt / 0.22);
+    if (this.reloadT >= 0) {
+      this.reloadT += dt;
+      if (this.reloadT >= this.reloadDur) this.endReload();
+    }
     if (this.deathT >= 0) this.deathT += dt;
     if (this.flashTime > 0) this.flashTime -= dt;
     if (this.hitFlash > 0) this.hitFlash -= dt;
@@ -541,22 +580,28 @@ class AgentVisual implements BotView {
     // root: position, facing, death tilt
     this.root.position.set(this.x, this.y, this.z);
     this.root.rotation.y = this.yaw;
+    // dying: the knees give way first, then the body falls back, accelerating like a real fall
+    const deadK = this.deathT >= 0 ? Math.min(1, this.deathT / 0.6) : 0;
     if (this.deathT >= 0) {
-      const t = Math.min(1, this.deathT / 0.35);
-      this.root.rotation.x = -t * 1.35;
-      this.root.position.y = this.y - t * 0.15;
+      const fall = deadK * deadK;
+      this.root.rotation.x = -fall * 1.42;
+      this.root.rotation.z = fall * this.deathRoll;
+      // the pivot is at the feet: raise it so the body comes to rest on its back, not half in the floor
+      this.root.position.y = this.y + fall * 0.11 * S;
     }
 
     // The pose is relative to the root, so it only needs solving again when its inputs change.
     // Off-screen bots keep their last pose; far ones re-pose at a third of the frame rate.
     const cam = this.assets.scene.activeCamera;
     if (cam && !cam.isInFrustum(this.body)) return;
-    const moving0 = Math.min(1, Math.hypot(this.moveX, this.moveZ) / 5.4);
+    const moving0 = Math.min(1, Math.hypot(this.moveX, this.moveZ) / RUN);
     const localMove = Math.atan2(this.moveX, this.moveZ) - this.yaw;
     const key =
       this.deathT >= 0
-        ? `dead${Math.min(1, this.deathT / 0.35).toFixed(2)}`
-        : `${this.crouch.toFixed(2)}|${this.aimPitch.toFixed(3)}|${moving0 > 0.05 ? `${this.walkPhase.toFixed(2)}|${moving0.toFixed(2)}|${localMove.toFixed(2)}` : 'idle'}`;
+        ? `dead${deadK.toFixed(2)}`
+        : `${this.crouch.toFixed(2)}|${this.aimPitch.toFixed(3)}|${this.kick.toFixed(1)}|${this.flinch.toFixed(1)}|${this.reloadT < 0 ? '' : (this.reloadT / this.reloadDur).toFixed(2)}|${
+            moving0 > 0.03 ? `${this.cycle.toFixed(3)}|${moving0.toFixed(2)}|${localMove.toFixed(2)}` : `idle${Math.floor(this.breath * 8)}`
+          }`;
     if (key === this.poseKey) return;
     this.frameNo++;
     if (this.poseKey && cam && this.frameNo % 3 !== 0 && Vector3.DistanceSquared(cam.globalPosition, this.root.position) > 30 * 30) return;
@@ -576,16 +621,20 @@ class AgentVisual implements BotView {
     const cosY = Math.cos(this.yaw);
     const fwd = new Vector3(sinY, 0, cosY);
     const right = new Vector3(cosY, 0, -sinY);
-    if (this.deathT >= 0) {
-      // dead: keep the rest pose with the gun lowered, tipped over with the root
-      this.refresh(n.shoulderR);
-      this.placeGun(this.pos(n.shoulderR, new Vector3()), fwd, right, up, -0.9);
-      return;
-    }
-
-    const moving = Math.min(1, Math.hypot(this.moveX, this.moveZ) / 5.4);
-    const c = this.crouch;
-    const ph = this.walkPhase;
+    const dead = this.deathT >= 0;
+    const sp = dead ? 0 : Math.hypot(this.moveX, this.moveZ);
+    const moving = Math.min(1, sp / RUN);
+    // a dying bot's knees buckle (a brief squat) while it falls
+    const c = dead ? 0.5 * Math.sin(Math.PI * Math.min(1, this.deathT / 0.5)) : this.crouch;
+    const mdir = sp > 0.05 ? new Vector3(this.moveX / sp, 0, this.moveZ / sp) : fwd;
+    /** Movement relative to the facing: forwards and to the right, −1..1. */
+    const mf = Vector3.Dot(mdir, fwd) * moving;
+    const mr = Vector3.Dot(mdir, right) * moving;
+    const p = this.cycle;
+    const swing = Math.sin(p * Math.PI * 2);
+    const kick = dead ? 0 : this.kick;
+    const flinch = dead ? 0 : this.flinch;
+    const breath = dead ? 0 : Math.sin(this.breath * 1.7) * (1 - moving);
 
     // feet rest positions (before the pelvis moves)
     this.refresh(n.footL);
@@ -593,69 +642,132 @@ class AgentVisual implements BotView {
     const footL = this.pos(n.footL, new Vector3());
     const footR = this.pos(n.footR, new Vector3());
 
-    // pelvis: crouch drop + walk bob + slight forward shift when crouched
-    const drop = CROUCH_DROP * c + Math.abs(Math.sin(ph)) * 0.035 * S * moving;
+    // pelvis: crouch drop, a dip at every footfall, sway over the planted foot, lean into the run
+    const bob = (0.5 - 0.5 * Math.cos(p * Math.PI * 4)) * 0.045 * S * moving;
+    const drop = CROUCH_DROP * c + 0.03 * S * moving + bob;
     this.refresh(n.pelvis);
-    this.translateWorld(n.pelvis, up.scale(-drop).addInPlace(fwd.scale(-0.08 * S * c)));
+    this.translateWorld(
+      n.pelvis,
+      up
+        .scale(-drop)
+        .addInPlace(mdir.scale(0.05 * S * moving))
+        .addInPlace(right.scale(-swing * 0.018 * S * moving)),
+    );
     this.refresh(n.pelvis);
 
-    // spine: lean forward when crouched, blade the rifle (turn right), follow aim pitch
-    const pitch = Math.max(-1.2, Math.min(1.2, this.aimPitch));
+    // spine: lean forward when crouched and into the run, blade the rifle (turn right),
+    // counter-swing the shoulders against the legs, follow the aim pitch
+    const pitch = dead ? -1.0 * deadK : Math.max(-1.2, Math.min(1.2, this.aimPitch));
+    const lean = 0.1 * c + 0.15 * mf;
     this.refresh(n.spine2);
-    this.rotateAxis(n.spine2, right, 0.32 * c);
+    this.rotateAxis(n.spine2, right, dead ? -0.3 * deadK : lean);
+    this.rotateAxis(n.spine2, fwd, -0.09 * mr);
     this.refresh(n.spine3);
-    this.rotateAxis(n.spine3, up, 0.22);
-    this.rotateAxis(n.spine3, right, -pitch * 0.3);
+    this.rotateAxis(n.spine3, up, 0.22 + swing * 0.07 * moving);
+    this.rotateAxis(n.spine3, right, -pitch * 0.3 - 0.1 * flinch);
     this.refresh(n.spine4);
-    this.rotateAxis(n.spine4, right, -pitch * 0.3);
+    this.rotateAxis(n.spine4, right, -pitch * 0.3 - 0.035 * kick + 0.012 * breath);
     this.refresh(n.neck);
-    this.rotateAxis(n.neck, up, -0.22);
-    this.rotateAxis(n.neck, right, -0.28 * c);
+    this.rotateAxis(n.neck, up, -0.22 - swing * 0.05 * moving);
+    this.rotateAxis(n.neck, right, -0.08 * c - 0.12 * mf);
     this.refresh(n.head);
-    this.rotateAxis(n.head, right, -pitch * 0.4);
+    this.rotateAxis(n.head, right, dead ? -0.45 * deadK : -pitch * 0.4 + 0.06 * flinch);
+    if (!dead) this.rotateAxis(n.head, fwd, 0.07 * mr);
 
-    // rifle in front of the right shoulder, pitched with the aim
+    // reload: the rifle tips up and rolls outwards while the left hand swaps the magazine
+    const rl = dead || this.reloadT < 0 ? -1 : Math.min(1, this.reloadT / this.reloadDur);
+    const tilt = rl < 0 ? 0 : Math.min(1, rl / 0.12, (1 - rl) / 0.12);
+    const tiltE = tilt * tilt * (3 - 2 * tilt);
+
+    // rifle in front of the right shoulder, pitched with the aim; it kicks back with each shot and
+    // bounces a little with the stride
     this.refresh(n.shoulderR);
     this.refresh(n.shoulderL);
     const shR = this.pos(n.shoulderR, new Vector3());
-    const grip = this.placeGun(shR, fwd, right, up, pitch);
+    const grip = this.placeGun(
+      shR,
+      fwd,
+      right,
+      up,
+      pitch + 0.045 * kick + 0.3 * tiltE,
+      -0.55 * tiltE,
+      -0.035 * S * kick,
+      Math.sin(p * Math.PI * 4) * 0.012 * S * moving - 0.04 * S * tiltE,
+    );
     const gunDir = this.gunDir;
     const gunUp = this.gunUp;
 
     // arms
     const handguard = grip.add(gunDir.scale(this.handguardFwd)).addInPlace(gunUp.scale(this.handguardUp));
+    let leftHand = handguard;
+    if (rl >= 0) {
+      // handguard → magazine → belt (old magazine away, new one out) → magazine → handguard
+      const magWell = grip.add(gunDir.scale(this.handguardFwd * 0.35)).addInPlace(gunUp.scale(-0.13 * S));
+      this.refresh(n.pelvis);
+      const belt = this.pos(n.pelvis, new Vector3()).addInPlace(right.scale(-0.22 * S)).addInPlace(fwd.scale(0.1 * S));
+      const stops: [number, Vector3][] = [
+        [0, handguard],
+        [0.14, magWell],
+        [0.24, magWell],
+        [0.44, belt],
+        [0.52, belt],
+        [0.72, magWell],
+        [0.84, magWell],
+        [1, handguard],
+      ];
+      let i = 1;
+      while (i < stops.length - 1 && rl > stops[i][0]) i++;
+      const [t0, a] = stops[i - 1];
+      const [t1, b] = stops[i];
+      const u = Math.min(1, Math.max(0, (rl - t0) / Math.max(1e-4, t1 - t0)));
+      leftHand = Vector3.Lerp(a, b, u * u * (3 - 2 * u));
+      // the magazine is out of the gun while the hand is away from it
+      this.rifleSkin?.mag?.setEnabled(rl < 0.24 || rl > 0.72);
+    }
     const poleR = shR.add(up.scale(-0.6)).addInPlace(right.scale(0.45)).addInPlace(fwd.scale(-0.15));
     this.ik(n.shoulderR, n.elbowR, n.handR, this.armLen.r, grip.add(gunUp.scale(-0.02)), poleR);
     this.refresh(n.fingerR);
     this.aim(n.handR, this.pos(n.fingerR, vD).subtract(this.pos(n.handR, vE)), gunDir);
     const shL = this.pos(n.shoulderL, new Vector3());
     const poleL = shL.add(up.scale(-0.7)).addInPlace(right.scale(-0.25));
-    this.ik(n.shoulderL, n.elbowL, n.handL, this.armLen.l, handguard, poleL);
+    this.ik(n.shoulderL, n.elbowL, n.handL, this.armLen.l, leftHand, poleL);
     this.refresh(n.fingerL);
     this.aim(n.handL, this.pos(n.fingerL, vD).subtract(this.pos(n.handL, vE)), gunDir);
 
-    // legs: planted feet, stepping along the movement direction when walking
-    const mlen = Math.hypot(this.moveX, this.moveZ);
-    const mdir = mlen > 0.01 ? new Vector3(this.moveX / mlen, 0, this.moveZ / mlen) : fwd;
-    const stride = 0.22 * S * moving;
-    const lift = 0.09 * S * moving;
-    const s = Math.sin(ph);
-    const cph = Math.cos(ph);
-    const spread = right.scale(0.05 * S * c);
+    // legs: each foot is planted while the body passes over it, then lifts and swings forward.
+    // Crouched, the bot drops into a low combat squat with the torso upright: the left foot flat
+    // out in front with its knee up, the right foot tucked back on its toes with the knee low and
+    // turned out.
+    const reach = gaitReach(moving, c) * Math.min(1, moving * 6);
+    const duty = gaitDuty(moving);
+    const lift = (0.05 + 0.13 * moving) * S * Math.min(1, moving * 6);
+    const [aL, hL] = gaitFoot(p, duty);
+    const [aR, hR] = gaitFoot(p + 0.5, duty);
+    const still = 1 - Math.min(1, moving * 2);
     const tL = footL
-      .add(mdir.scale(stride * s))
-      .addInPlace(up.scale(Math.max(0, cph) * lift))
-      .subtractInPlace(spread);
+      .add(mdir.scale(reach * aL))
+      .addInPlace(up.scale(hL * lift))
+      .addInPlace(right.scale(-0.07 * S * c))
+      .addInPlace(fwd.scale(0.24 * S * c * still));
     const tR = footR
-      .add(mdir.scale(-stride * s))
-      .addInPlace(up.scale(Math.max(0, -cph) * lift))
-      .addInPlace(spread);
-    for (const [hip, knee, foot, target, lens] of [
-      [n.hipL, n.kneeL, n.footL, tL, this.legLen.l],
-      [n.hipR, n.kneeR, n.footR, tR, this.legLen.r],
+      .add(mdir.scale(reach * aR))
+      .addInPlace(up.scale(hR * lift + 0.07 * S * c * still))
+      .addInPlace(right.scale(0.03 * S * c))
+      .addInPlace(fwd.scale(-0.2 * S * c * still));
+    this.refresh(n.kneeL);
+    this.refresh(n.kneeR);
+    const kneePoleL = this.pos(n.kneeL, new Vector3())
+      .addInPlace(fwd.scale(0.8))
+      .addInPlace(up.scale(0.2 + 0.5 * c))
+      .addInPlace(right.scale(-0.12 * c));
+    const kneePoleR = this.pos(n.kneeR, new Vector3())
+      .addInPlace(fwd.scale(0.8))
+      .addInPlace(up.scale(0.2 - 0.9 * c * still))
+      .addInPlace(right.scale(0.22 * c));
+    for (const [hip, knee, foot, target, lens, pole] of [
+      [n.hipL, n.kneeL, n.footL, tL, this.legLen.l, kneePoleL],
+      [n.hipR, n.kneeR, n.footR, tR, this.legLen.r, kneePoleR],
     ] as const) {
-      this.refresh(knee);
-      const pole = this.pos(knee, new Vector3()).addInPlace(fwd.scale(0.8)).addInPlace(up.scale(0.2));
       this.refresh(foot);
       this.ik(hip, knee, foot, lens as [number, number], target, pole);
     }
@@ -665,14 +777,19 @@ class AgentVisual implements BotView {
   private gunUp = new Vector3(0, 1, 0);
 
   /** Place the rifle from the right shoulder; returns the grip point. */
-  private placeGun(shoulderR: Vector3, fwd: Vector3, right: Vector3, up: Vector3, pitch: number): Vector3 {
+  private placeGun(shoulderR: Vector3, fwd: Vector3, right: Vector3, up: Vector3, pitch: number, roll = 0, back = 0, rise = 0): Vector3 {
     const cp = Math.cos(pitch);
     const sp = Math.sin(pitch);
     const f = fwd.scale(cp).addInPlace(up.scale(sp));
-    const u = up.scale(cp).subtractInPlace(fwd.scale(sp));
+    let u = up.scale(cp).subtractInPlace(fwd.scale(sp));
+    const grip = shoulderR
+      .add(f.scale(0.2 * S + back))
+      .addInPlace(u.scale(-0.13 * S + rise))
+      .addInPlace(right.scale(-0.06 * S));
+    // roll about the barrel
+    if (roll !== 0) u = u.scale(Math.cos(roll)).addInPlace(Vector3.Cross(f, u).scale(Math.sin(roll)));
     this.gunDir.copyFrom(f);
     this.gunUp.copyFrom(u);
-    const grip = shoulderR.add(f.scale(0.2 * S)).addInPlace(u.scale(-0.13 * S)).addInPlace(right.scale(-0.06 * S));
     this.gun.position.copyFrom(grip);
     // gun local axes: +X right, +Y up, +Z along the barrel
     Quaternion.RotationQuaternionFromAxisToRef(Vector3.Cross(u, f), u, f, this.gun.rotationQuaternion!);
